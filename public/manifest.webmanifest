@@ -1,0 +1,17 @@
+{
+  "name": "GAMER ID — Your Gaming Identity",
+  "short_name": "GAMER ID",
+  "description": "Create your gaming profile, showcase your achievements and find players who play like you.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#05060a",
+  "theme_color": "#05060a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
