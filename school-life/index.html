@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>School Life: Open Campus | زندگی در مدرسه</title>
+<meta name="description" content="یک بازی سه‌بعدی جهان‌باز مدرسه‌ای در مرورگر — School Life: Open Campus">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏫</text></svg>">
+</head>
+<body>
+<div id="scene"></div>
+
+<!-- ===== لودینگ ===== -->
+<div id="loading" class="overlay">
+  <div class="load-box">
+    <div class="load-logo">🏫</div>
+    <h1>School Life <span>Open Campus</span></h1>
+    <p class="load-sub">زندگی در مدرسه — نسخه مرورگر</p>
+    <div class="load-bar"><div id="load-bar-fill"></div></div>
+    <p id="load-msg">در حال بارگذاری...</p>
+    <p id="load-tip">💡 نکته: با کلید E می‌توانی با دیگران صحبت کنی.</p>
+  </div>
+</div>
+
+<!-- ===== خطای لود موتور سه‌بعدی ===== -->
+<div id="boot-error" class="overlay hidden">
+  <div class="panel small">
+    <h2>خطا در بارگذاری موتور سه‌بعدی</h2>
+    <p>برای اجرای بازی به اینترنت نیاز است تا کتابخانه Three.js دانلود شود.<br>اتصال اینترنت را بررسی کن و دوباره تلاش کن.</p>
+    <button id="boot-retry" class="btn primary">تلاش دوباره</button>
+  </div>
+</div>
+
+<div id="webgl-error" class="overlay hidden">
+  <div class="panel small">
+    <h2>WebGL در دسترس نیست</h2>
+    <p>مرورگر تو از WebGL پشتیبانی نمی‌کند. لطفاً از آخرین نسخه Chrome یا Edge استفاده کن.</p>
+  </div>
+</div>
+
+<!-- ===== منوی اصلی ===== -->
+<div id="main-menu" class="overlay hidden">
+  <div class="menu-box">
+    <div class="menu-badge">نسخه ۱٫۰ — کاملاً اورجینال</div>
+    <h1 class="game-title">School Life<br><span>Open Campus</span></h1>
+    <p class="game-sub">یک روز کامل در دبیرستان آفتاب — بگرد، مأموریت انجام بده، رانندگی کن!</p>
+    <div class="menu-btns">
+      <button id="btn-new" class="btn primary big">شروع بازی جدید</button>
+      <button id="btn-continue" class="btn big">ادامه بازی</button>
+      <div class="menu-row">
+        <button id="btn-settings" class="btn">تنظیمات</button>
+        <button id="btn-help" class="btn">راهنما</button>
+      </div>
+    </div>
+    <p id="menu-saveinfo" class="saveinfo"></p>
+    <p class="menu-foot">⌨️ نیاز به کیبورد و موس دارد — بهترین تجربه در Chrome و Edge</p>
+  </div>
+</div>
+
+<!-- ===== HUD ===== -->
+<div id="hud" class="hidden">
+  <div class="hud-top-right">
+    <div class="bars">
+      <div class="bar-row"><span class="bar-ico hp">♥</span><div class="bar"><div id="hp-fill"></div></div><span id="hp-text" class="bar-num">۱۰۰</span></div>
+      <div class="bar-row"><span class="bar-ico en">⚡</span><div class="bar"><div id="en-fill"></div></div><span id="en-text" class="bar-num">۱۰۰</span></div>
+    </div>
+    <div class="wallet">
+      <span class="coin-pill">🪙 <b id="coins-val">۴۰</b></span>
+      <span class="score-pill">★ <b id="score-val">۰</b></span>
+    </div>
+  </div>
+
+  <div class="hud-top-center">
+    <div class="clock-box"><span id="phase-dot"></span><b id="clock-val">۰۹:۰۰</b><span id="phase-val">صبح</span></div>
+    <div id="mission-timer" class="hidden">⏳ <b id="timer-val">۲:۳۰</b></div>
+    <div id="tracker"></div>
+  </div>
+
+  <div class="hud-top-left">
+    <div id="minimap-wrap"><canvas id="minimap" width="220" height="220"></canvas><div class="map-hint">نقشه: Tab</div></div>
+    <div id="fps">۶۰ FPS</div>
+    <div class="hud-btns">
+      <button id="btn-map" class="icon-btn" title="نقشه (Tab)">🗺</button>
+      <button id="btn-inv" class="icon-btn" title="کوله‌پشتی (I)">🎒</button>
+      <button id="btn-mute" class="icon-btn" title="صدا">🔊</button>
+      <button id="btn-pause2" class="icon-btn" title="توقف (P/Esc)">⏸</button>
+    </div>
+    <div class="quest-pct">پیشرفت: <b id="hud-quest-count">۰٪</b></div>
+  </div>
+
+  <div id="prompt" class="hidden"><span id="prompt-text"></span></div>
+  <div id="driving-hint" class="hidden"></div>
+  <div id="toasts"></div>
+  <div id="lock-hint" class="hidden">برای ادامه بازی کلیک کن 👆</div>
+  <div class="controls-hint">WASD حرکت • موس نگاه • Shift دویدن • Space پرش • E تعامل</div>
+</div>
+
+<!-- ===== بنر مأموریت ===== -->
+<div id="banner" class="hidden">
+  <h2 id="banner-title"></h2>
+  <p id="banner-sub"></p>
+</div>
+
+<!-- ===== دیالوگ ===== -->
+<div id="dialogue" class="overlay hidden">
+  <div class="dlg-box">
+    <div id="dlg-name"></div>
+    <p id="dlg-text"></p>
+    <div id="dlg-options"></div>
+  </div>
+</div>
+
+<!-- ===== فروشگاه بوفه ===== -->
+<div id="shop" class="overlay hidden">
+  <div class="panel">
+    <h2>🍔 بوفه مدرسه <span class="shop-coins">🪙 <b id="shop-coins">۰</b></span></h2>
+    <div id="shop-items"></div>
+    <button id="shop-close" class="btn">بستن</button>
+  </div>
+</div>
+
+<!-- ===== کوله‌پشتی ===== -->
+<div id="inventory" class="overlay hidden">
+  <div class="panel">
+    <h2>🎒 کوله‌پشتی <span class="shop-coins">🪙 <b id="inv-coins">۰</b></span></h2>
+    <div id="inv-items"></div>
+    <button id="inv-close" class="btn">بستن (I)</button>
+  </div>
+</div>
+
+<!-- ===== نقشه بزرگ ===== -->
+<div id="bigmap" class="overlay hidden">
+  <div class="panel map-panel">
+    <h2>🗺 نقشه مدرسه <span class="map-legend">🔴 تو • 🟡 مأموریت • 🟦 خودرو</span></h2>
+    <canvas id="bigmap-canvas" width="560" height="560"></canvas>
+    <button id="bigmap-close" class="btn">بستن (Tab)</button>
+  </div>
+</div>
+
+<!-- ===== توقف ===== -->
+<div id="pause" class="overlay hidden">
+  <div class="panel small">
+    <h2>⏸ بازی متوقف شد</h2>
+    <p id="pause-saveinfo" class="saveinfo"></p>
+    <div class="menu-btns">
+      <button id="btn-resume" class="btn primary">ادامه</button>
+      <button id="btn-save" class="btn">ذخیره بازی</button>
+      <div class="menu-row">
+        <button id="btn-settings2" class="btn">تنظیمات</button>
+        <button id="btn-help2" class="btn">راهنما</button>
+      </div>
+      <button id="btn-quit" class="btn danger">ذخیره و خروج به منو</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== تنظیمات ===== -->
+<div id="settings" class="overlay hidden">
+  <div class="panel small">
+    <h2>⚙️ تنظیمات</h2>
+    <label class="set-row">کیفیت گرافیک
+      <select id="set-quality">
+        <option value="low">Low — سریع (سیستم ضعیف)</option>
+        <option value="medium">Medium — متعادل</option>
+        <option value="high">High — زیبا (سیستم قوی)</option>
+      </select>
+    </label>
+    <label class="set-row">صدا <span id="set-vol-val">۷۰٪</span>
+      <input id="set-volume" type="range" min="0" max="100" value="70">
+    </label>
+    <label class="set-row check">بی‌صدا <input id="set-muted" type="checkbox"></label>
+    <label class="set-row">حساسیت موس <span id="set-sens-val">۵۰٪</span>
+      <input id="set-sens" type="range" min="15" max="125" value="50">
+    </label>
+    <label class="set-row check">نمایش FPS <input id="set-fps" type="checkbox" checked></label>
+    <label class="set-row check">مینی‌مپ <input id="set-minimap" type="checkbox" checked></label>
+    <button id="set-back" class="btn primary">بازگشت</button>
+  </div>
+</div>
+
+<!-- ===== راهنما ===== -->
+<div id="help" class="overlay hidden">
+  <div class="panel">
+    <h2>❓ راهنمای بازی</h2>
+    <div class="help-grid">
+      <div><span class="key">W A S D</span> حرکت</div>
+      <div><span class="key">موس</span> نگاه کردن</div>
+      <div><span class="key">Shift</span> دویدن (انرژی مصرف می‌کند)</div>
+      <div><span class="key">Space</span> پرش / ترمز خودرو</div>
+      <div><span class="key">E</span> صحبت، برداشتن، سوار/پیاده شدن</div>
+      <div><span class="key">Tab</span> نقشه بزرگ</div>
+      <div><span class="key">I</span> کوله‌پشتی</div>
+      <div><span class="key">P / Esc</span> توقف بازی</div>
+      <div><span class="key">۱-۹</span> انتخاب گزینه در گفت‌وگو</div>
+    </div>
+    <h3>مأموریت‌ها (۸ مأموریت — دنبال علامت ! برو)</h3>
+    <div id="help-quests"></div>
+    <p class="tip">💡 سکه‌ها را جمع کن، از بوفه غذا بخر و مراقب انرژی‌ات باش. بازی هر ۶۰ ثانیه خودکار ذخیره می‌شود.</p>
+    <button id="help-close" class="btn primary">بستن</button>
+  </div>
+</div>
+
+<!-- ===== بوت‌لودر: انتخاب CDN سالم برای Three.js ===== -->
+<script>
+(function () {
+  var SOURCES = [
+    'src/lib/three.module.js', // کپی محلی اختیاری (اجرای آفلاین) — راهنما در README
+    'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
+    'https://unpkg.com/three@0.160.0/build/three.module.js'
+  ];
+  var TIPS = [
+    '💡 نکته: با کلید E می‌توانی با دیگران صحبت کنی.',
+    '💡 نکته: دنبال NPCهایی با علامت ! طلایی برو.',
+    '💡 نکته: سکه‌های طلایی محوطه را جمع کن.',
+    '💡 نکته: با خودروی محوطه سریع‌تر سفر کن (پارکینگ).',
+    '💡 نکته: دویدن انرژی مصرف می‌کند؛ آبمیوه بخر!',
+    '💡 نکته: کلید Tab نقشه بزرگ را باز می‌کند.'
+  ];
+  var tipI = 0;
+  var tipTimer = setInterval(function () {
+    var el = document.getElementById('load-tip');
+    if (!el) { clearInterval(tipTimer); return; }
+    tipI = (tipI + 1) % TIPS.length;
+    el.textContent = TIPS[tipI];
+  }, 3500);
+
+  function tryHead(url, timeout) {
+    return new Promise(function (resolve) {
+      var done = false;
+      var timer = setTimeout(function () { if (!done) { done = true; resolve(false); } }, timeout);
+      fetch(url, { method: 'HEAD', cache: 'force-cache' }).then(function (r) {
+        if (!done) { done = true; clearTimeout(timer); resolve(!!(r && r.ok)); }
+      }).catch(function () {
+        if (!done) { done = true; clearTimeout(timer); resolve(false); }
+      });
+    });
+  }
+
+  function fail(msg) {
+    var m = document.getElementById('load-msg');
+    if (m) m.textContent = msg;
+    document.getElementById('boot-error').classList.remove('hidden');
+  }
+
+  (async function boot() {
+    var msg = document.getElementById('load-msg');
+    if (msg) msg.textContent = 'اتصال به موتور سه‌بعدی...';
+    var chosen = null;
+    // اول کپی محلی (سریع fail می‌شود اگر نباشد)
+    if (await tryHead(SOURCES[0], 2500)) chosen = SOURCES[0];
+    // بعد CDNها
+    if (!chosen) {
+      if (msg) msg.textContent = 'دانلود موتور سه‌بعدی از اینترنت...';
+      if (await tryHead(SOURCES[1], 9000)) chosen = SOURCES[1];
+      else if (await tryHead(SOURCES[2], 9000)) chosen = SOURCES[2];
+    }
+    if (!chosen) { fail('اتصال ناموفق بود.'); return; }
+    var im = document.createElement('script');
+    im.type = 'importmap';
+    im.textContent = JSON.stringify({ imports: { three: chosen } });
+    document.head.appendChild(im);
+    var s = document.createElement('script');
+    s.type = 'module';
+    s.src = 'src/main.js';
+    s.onerror = function () { fail('خطا در بارگذاری فایل‌های بازی.'); };
+    document.body.appendChild(s);
+  })();
+})();
+</script>
+</body>
+</html>
