@@ -100,6 +100,21 @@ export class AudioSys {
       case 'secret':
         [392, 523, 659, 784, 1046, 1318].forEach((f, i) => this._tone(f, 0.2, 'sine', 0.18, null, i * 0.09));
         break;
+      /* ---------- صداهای گسترش: حیوانات، هوا، جشن ---------- */
+      case 'page': this._noise(0.12, 0.18, 3200, 0, 'highpass'); this._noise(0.1, 0.14, 2400, 0.13, 'highpass'); break;
+      case 'meow': this._tone(720, 0.22, 'sawtooth', 0.16, 420); this._tone(560, 0.3, 'sine', 0.12, 380, 0.16); break;
+      case 'bark': this._noise(0.1, 0.3, 420, 0, 'lowpass'); this._tone(240, 0.12, 'square', 0.16, 140); this._noise(0.09, 0.26, 380, 0.16, 'lowpass'); break;
+      case 'chirp': [1800, 2400, 2100].forEach((f, i) => this._tone(f, 0.07, 'sine', 0.12, f * 1.3, i * 0.08)); break;
+      case 'flap': this._noise(0.07, 0.16, 900, 0, 'bandpass'); this._noise(0.07, 0.14, 700, 0.09, 'bandpass'); this._noise(0.07, 0.12, 800, 0.18, 'bandpass'); break;
+      case 'wind': this._noise(0.7, 0.12, 620, 0, 'lowpass'); break;
+      case 'thunder': this._noise(0.9, 0.4, 90, 0, 'lowpass'); this._noise(0.5, 0.22, 180, 0.25, 'lowpass'); break;
+      case 'horn': this._tone(340, 0.28, 'square', 0.15); this._tone(452, 0.26, 'square', 0.12); break;
+      case 'swim': this._noise(0.3, 0.1, 1500, 0, 'bandpass'); break;
+      case 'party':
+        [523, 659, 784, 988, 1175].forEach((f, i) => this._tone(f, 0.14, 'triangle', 0.2, null, i * 0.08));
+        [523, 784, 1046].forEach((f, i) => this._tone(f, 0.5, 'sine', 0.16, null, 0.5 + i * 0.06));
+        break;
+      case 'record': [784, 988, 1318].forEach((f, i) => this._tone(f, 0.16, 'triangle', 0.22, null, i * 0.09)); break;
       default: break;
     }
   }

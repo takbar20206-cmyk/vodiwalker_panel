@@ -49,7 +49,7 @@ export class Group extends Obj {}
 export class Mesh extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; } }
 export class Sprite extends Obj { constructor(m) { super(); this.material = m; } }
 export class Points extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; } }
-class Geo { translate() { return this; } rotateX() { return this; } rotateZ() { return this; } computeBoundingSphere() { return this; } }
+class Geo { translate() { return this; } rotateX() { return this; } rotateZ() { return this; } computeBoundingSphere() { return this; } computeVertexNormals() { return this; } dispose() { return this; } setDrawRange() { return this; } }
 export class BoxGeometry extends Geo { constructor() { super(); } }
 export class SphereGeometry extends Geo { constructor() { super(); } }
 export class CylinderGeometry extends Geo { constructor() { super(); } }
@@ -57,7 +57,7 @@ export class ConeGeometry extends Geo { constructor() { super(); } }
 export class PlaneGeometry extends Geo { constructor() { super(); } }
 export class RingGeometry extends Geo { constructor() { super(); } }
 export class TorusGeometry extends Geo { constructor() { super(); } }
-export class BufferGeometry extends Geo { setAttribute() { return this; } }
+export class BufferGeometry extends Geo { setAttribute() { return this; } setIndex(i) { this.index = i; return this; } }
 export class BufferAttribute { constructor(a, n) { this.array = a; } setUsage() { return this; } }
 class Mat { constructor(p) { Object.assign(this, p || {}); if (typeof this.color === 'number') this.color = new Color(this.color); } }
 export class MeshLambertMaterial extends Mat {}
@@ -105,7 +105,7 @@ function fakeCtx() {
     get(t, p) {
       if (p in t) return t[p];
       if (p === 'measureText') return function () { return { width: 42 }; };
-      if (p === 'createRadialGradient') return function () { return { addColorStop() {} }; };
+      if (p === 'createRadialGradient' || p === 'createLinearGradient') return function () { return { addColorStop() {} }; };
       if (p === 'getChannelData') return function () { return []; };
       return function () {};
     },
@@ -163,6 +163,17 @@ function ok(name, cond) {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** صحبت تضمینی با NPC مشخص: نزدیک‌ترین NPC ممکن است یک دانش‌آموز رهگذر باشد */
+function talk(game, id) {
+  for (let i = 0; i < 4; i++) game._frame();
+  const t = game._interact;
+  if (t && t.type === 'npc' && t.ref.id === id) { game.doInteract(); return true; }
+  const n = game.npcs.npcById(id);
+  if (!n) return false;
+  n.onTalk(n);
+  return true;
+}
+
 async function main() {
   // ۱) کپی منابع به tmp با بازنویسی ایمپورت three
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sloc-smoke-'));
@@ -185,11 +196,11 @@ async function main() {
 
   console.log('== world contents ==');
   ok('colliders > 150', game.world.colliders.length > 150);
-  ok('21 NPCs', game.npcs.npcs.length === 21);
+  ok('NPCs >= 40 (school + city + dorm + pool)', game.npcs.npcs.length >= 40);
   ok('10 coins', game.world.coins.length === 10);
   ok('12 pickups', Object.keys(game.world.pickups).length === 12);
-  ok('4 vehicles', game.vehicles.list.length === 4);
-  ok('8 missions', Object.keys(game.missions.st).length === 8);
+  ok('vehicles >= 7 (4 + karts)', game.vehicles.list.length >= 7);
+  ok('missions >= 24 (8 + story chain)', Object.keys(game.missions.st).length >= 24);
 
   console.log('== gameplay: start + walk ==');
   game.startPlaying(true);
@@ -207,7 +218,7 @@ async function main() {
   game.player.pos.set(8, 0, 3.5);
   for (let i = 0; i < 5; i++) game._frame();
   ok('sara interact found', game._interact && game._interact.type === 'npc');
-  game.doInteract();
+  talk(game, 'sara');
   ok('dialogue opened', game.ui.isOpen('dialogue'));
   game.ui.chooseOption(0);
   ok('quest accepted', game.missions.st.lost_bag.st === 'active');
@@ -217,16 +228,15 @@ async function main() {
   game.doInteract();
   ok('bag picked', game.inv.bag === 1 && game.missions.st.lost_bag.prog === 1);
   game.player.pos.set(8, 0, 3.5);
-  for (let i = 0; i < 5; i++) game._frame();
-  game.doInteract();
+  talk(game, 'sara');
   game.ui.chooseOption(0);
   ok('mission 1 done', game.missions.st.lost_bag.st === 'done');
   ok('coins rewarded', game.coins >= 90);
 
   console.log('== mission 3: football ==');
   game.player.pos.set(28, 0, 13);
-  for (let i = 0; i < 5; i++) game._frame();
-  game.doInteract(); game.ui.chooseOption(0);
+  talk(game, 'rostami');
+  game.ui.chooseOption(0);
   ok('football active', game.missions.st.football.st === 'active');
   game.world._goalScored('east'); game.world.resetBall();
   game.world._goalScored('east'); game.world.resetBall();
@@ -234,27 +244,29 @@ async function main() {
   ok('wrong goal ignored', game.missions.st.football.prog === 2);
   game.world._goalScored('east'); game.world.resetBall();
   ok('3 goals counted', game.missions.st.football.prog === 3);
-  game.doInteract(); game.ui.chooseOption(0);
+  talk(game, 'rostami');
+  game.ui.chooseOption(0);
   ok('mission 3 done', game.missions.st.football.st === 'done');
 
   console.log('== mission 4: timed note (fail + success) ==');
   game.player.pos.set(8, 0, -20.5);
-  for (let i = 0; i < 5; i++) game._frame();
-  game.doInteract(); game.ui.chooseOption(0);
+  talk(game, 'nima');
+  game.ui.chooseOption(0);
   ok('timed active', game.missions.st.timed_note.st === 'active');
   ok('timer running', game.missions.getTimer() > 100);
   game.missions.update(200);
   ok('timeout fails quest', game.missions.st.timed_note.st === 'available' && game.inv.note === 0);
-  game.doInteract(); game.ui.chooseOption(0);
+  talk(game, 'nima');
+  game.ui.chooseOption(0);
   game.player.pos.set(19, 0, -29);
-  for (let i = 0; i < 5; i++) game._frame();
-  game.doInteract(); game.ui.chooseOption(0);
+  talk(game, 'rezaei');
+  game.ui.chooseOption(0);
   ok('mission 4 done', game.missions.st.timed_note.st === 'done');
 
   console.log('== mission 5: secret path ==');
   game.player.pos.set(-42, 0, -35);
-  for (let i = 0; i < 5; i++) game._frame();
-  game.doInteract(); game.ui.chooseOption(0);
+  talk(game, 'karimi');
+  game.ui.chooseOption(0);
   ok('secret active', game.missions.st.secret_path.st === 'active');
   game.player.pos.set(-54, 0, -40);
   for (let i = 0; i < 5; i++) game._frame();
@@ -265,48 +277,53 @@ async function main() {
   game.player.pos.set(-16, 0, 13.0);
   for (let i = 0; i < 5; i++) game._frame();
   game.doInteract();
-  ok('shop opened', game.ui.isOpen('shop'));
+  ok('shop opened', game.ui.isOpen('shop') || game.ui.isOpen('dialogue'));
+  if (game.ui.isOpen('dialogue')) { game.ui.chooseOption(0); ok('shop opened (via seller)', game.ui.isOpen('shop')); }
   const coinsBefore = game.coins;
   game.missions._buy({ id: 'sandwich', name: 'x', price: 15 });
   game.missions._buy({ id: 'juice', name: 'x', price: 10 });
   ok('bought food', game.inv.sandwich === 1 && game.inv.juice === 1 && game.coins === coinsBefore - 25);
   game.ui.closeShop();
   game.player.pos.set(-6, 0, 11);
-  for (let i = 0; i < 5; i++) game._frame();
-  game.doInteract(); game.ui.chooseOption(0);
-  game.doInteract(); game.ui.chooseOption(0);
+  talk(game, 'kian');
+  game.ui.chooseOption(0);
+  talk(game, 'kian');
+  game.ui.chooseOption(0);
   ok('mission 6 done', game.missions.st.help_student.st === 'done');
 
   console.log('== mission 7: cans ==');
   game.player.pos.set(-38, 0, 46);
-  for (let i = 0; i < 5; i++) game._frame();
-  game.doInteract(); game.ui.chooseOption(0);
+  talk(game, 'donya');
+  game.ui.chooseOption(0);
   for (let i = 0; i < 8; i++) game.world._takePickup('can' + i);
   ok('8 cans', game.missions.st.collect_cans.prog === 8);
-  game.doInteract(); game.ui.chooseOption(0);
+  talk(game, 'donya');
+  game.ui.chooseOption(0);
   ok('mission 7 done', game.missions.st.collect_cans.st === 'done');
 
   console.log('== mission 2: books ==');
   game.player.pos.set(-17.5, 0, -30);
-  for (let i = 0; i < 5; i++) game._frame();
-  game.doInteract(); game.ui.chooseOption(0);
+  talk(game, 'farhadi');
+  game.ui.chooseOption(0);
+  ok('books quest active', game.missions.st.library_books.st === 'active');
   for (let i = 0; i < 3; i++) game.world._takePickup('book' + i);
   game.player.pos.set(47.2, 0, -30.5);
   for (let i = 0; i < 5; i++) game._frame();
   ok('librarian reachable', game._interact && game._interact.type === 'npc');
-  game.doInteract();
+  talk(game, 'ahmadi');
   // گزینه تحویل کتاب (اولین گزینه)
   game.ui.chooseOption(0);
   ok('mission 2 done', game.missions.st.library_books.st === 'done');
 
   console.log('== mission 8: riddle ==');
-  game.doInteract(); // احمدی: شنیدن معما
+  talk(game, 'ahmadi'); // احمدی: شنیدن معما
   game.ui.chooseOption(0);
   game.ui.chooseOption(1); // جواب غلط
   ok('wrong answer retry', game.missions.st.riddle.st !== 'done');
   game.ui.chooseOption(0); // فردا
   ok('mission 8 done', game.missions.st.riddle.st === 'done');
-  ok('100% complete', game.missions.completionPct() === 100);
+  ok('8 legacy missions complete (v1 chain)', game.missions.completionPct() >= 33);
+  ok('story chain registered', Object.keys(game.missions.dyn).length >= 16);
 
   console.log('== vehicles ==');
   game.player.pos.set(-54, 0, 46);
@@ -368,12 +385,165 @@ async function main() {
   for (let i = 0; i < 5; i++) game._frame();
   ok('coin collected', game.coins === c0 + 5);
 
+  console.log('== expansion: weather & animals ==');
+  ok('weather starts on auto', game.weather.mode === 'auto');
+  game.cycleWeather();
+  ok('weather cycles', game.weather.mode === 'clear');
+  game.weather.set('rain', true);
+  for (let i = 0; i < 120; i++) game._frame();
+  ok('rain wets the ground', game.weather.isWet);
+  ok('rain changes music hint', game.weather.musicHint() === 'rain');
+  game.weather.set('snow', true);
+  for (let i = 0; i < 120; i++) game._frame();
+  ok('snow accumulates', game.weather.snow01 > 0.01);
+  game.weather.set('clear', true);
+  for (let i = 0; i < 30; i++) game._frame();
+  ok('animals exist', game.animals.list.length >= 8);
+  ok('ext visuals hook', typeof game.world.ext.updateVisuals === 'function');
+  const cat = game.animals.cat;
+  if (cat) { game.player.pos.set(cat.x, 0, cat.z); }
+  const fed0 = game.animals.stats.fed;
+  game.petAnimal();
+  ok('pet/feed animal', game.animals.stats.fed > fed0);
+  ok('animal after weather (visible again)', game.animals.list.some((a) => a.mesh.visible));
+
+  console.log('== expansion: karts & racing ==');
+  const kart = game.vehicles.byId('kart1');
+  ok('player kart exists on pit lane', !!kart && kart.type === 'kart');
+  ok('two more karts parked', !!game.vehicles.byId('kart2') && !!game.vehicles.byId('kart3'));
+  ok('race track built', !!(game.world.ext.track && game.world.ext.track.pts.length > 50));
+  game.openRaceMenu();
+  ok('race menu opens', game.ui.isOpen('race-menu'));
+  game.ui.closePanel('race-menu');
+  game.racing.start('timeTrial');
+  ok('countdown started', game.racing.state === 'countdown');
+  ok('player seated in kart', game.vehicles.active === kart && game.racing.laps === 3);
+  for (let i = 0; i < 260; i++) game._frame();
+  ok('race running after countdown', game.racing.state === 'racing');
+  game.keys.add('KeyW');
+  for (let i = 0; i < 100; i++) game._frame();
+  game.keys.delete('KeyW');
+  ok('kart accelerates on track', Math.abs(kart.speed) > 1 && game.racing.totalTime > 0);
+  ok('race HUD data', game.racing.info().laps === 3);
+  game.racing.abort();
+  ok('race aborted', game.racing.state === 'idle');
+  game.doInteract();
+  ok('exit kart', !game.vehicles.active);
+
+  console.log('== expansion: grades & exams ==');
+  ok('six subjects', game.grades.report().subjects.length === 6);
+  game.timeH = 9;
+  game.player.pos.set(-19, 0, -28);
+  const kn0 = game.grades.knowledge.math;
+  for (let i = 0; i < 40; i++) game._frame();
+  ok('class attendance raises knowledge', game.grades.knowledge.math > kn0);
+  game.player.pos.set(0, 0, 40);
+  game.grades.knowledge.math = 90;
+  game.grades.startExam('math');
+  ok('exam panel opens', game.ui.isOpen('exam'));
+  for (let q = 0; q < 6 && game.grades.exam; q++) {
+    const cur = game.grades.exam.list[game.grades.exam.i];
+    game.grades._answer(cur.a);
+  }
+  ok('exam graded', game.grades.grades.math != null && game.grades.grades.math >= 15);
+  ok('gpa computed', game.grades.gpa() > 0);
+  game.ui.closePanel('exam-result');
+  game.grades.openPanel();
+  ok('report card opens', game.ui.isOpen('grades'));
+  game.ui.closePanel('grades');
+  game.grades.study();
+  ok('study raises knowledge', game.grades.studySessions >= 1);
+
+  console.log('== expansion: story chain & party ==');
+  const coinsB = game.coins;
+  game.story.start('welcome_tour');
+  ok('story quest starts', game.story.stateOf('welcome_tour') === 'active');
+  for (const sp of [[0, 8], [-19, -28], [43, -30], [-16, 12.5]]) {
+    game.player.pos.set(sp[0], 0, sp[1]);
+    for (let i = 0; i < 3; i++) game._frame();
+  }
+  ok('tour spots visited', Object.keys(game.story.tour).length >= 4);
+  game.player.pos.set(0, 0, 40);
+  game.story.complete('welcome_tour');
+  ok('story quest completes + reward', game.story.stateOf('welcome_tour') === 'done' && game.coins >= coinsB + 60);
+  ok('journal has 4 chapters', game.story.journal().chapters.length === 4);
+  game.story.openJournal();
+  ok('journal panel opens', game.ui.isOpen('journal'));
+  game.ui.closePanel('journal');
+  game.story.start('cat_friend');
+  ok('side quest starts', game.story.stateOf('cat_friend') === 'active');
+  game.party.start();
+  ok('party starts', game.party.active && game.partyOn);
+  game.player.pos.set(0, 0, 24);   // روی صحنهٔ جشن
+  game.party.dance();
+  game.party.lastMove = -1e6;
+  game.party.dance();
+  ok('dance combo builds', game.party.danceCombo >= 2);
+  ok('party balloons spawned', game.party.balloons.length > 10);
+  game.party.stop();
+  ok('party ends', !game.party.active && !game.partyOn);
+
+  console.log('== expansion: music, voice, achievements, ride ==');
+  game.music.autoSelect({ state: 'playing', timeH: 12 });
+  ok('day music selected', game.music.track === 'day');
+  game.music.autoSelect({ state: 'playing', timeH: 22 });
+  ok('night/dusk music selected', game.music.track === 'night' || game.music.track === 'dusk');
+  game.music.autoSelect({ state: 'playing', racing: true, timeH: 12 });
+  ok('race music selected', game.music.track === 'race');
+  game.music.lockTrack(null);
+  game.music.autoSelect({ state: 'playing', timeH: 12 });
+  ok('33 achievements defined', game.achievements.total() === 33);
+  const u0 = game.achievements.count();
+  game.achievements.unlock('first_step');
+  ok('achievement unlocks', game.achievements.count() >= u0 + 1);
+  game.achievements.open();
+  ok('achievements panel', game.ui.isOpen('achievements'));
+  game.ui.closePanel('achievements');
+  let voiceOk = true;
+  try { game.voice.speak('سلام! به دبیرستان آفتاب خوش آمدی.', 'teacher'); } catch (e) { voiceOk = false; }
+  ok('persian voice does not throw', voiceOk);
+  ok('voice mode valid', ['tts', 'babble', 'off'].includes(game.voice.mode));
+  game.cycleVoice();
+  ok('voice cycles', game.voice.mode !== 'tts');
+  game.player.pos.set(0, 0, 45);
+  game.toggleRide('skate');
+  ok('no skateboard yet', game.player.ride !== 'skate');
+  game.hasSkateboard = true;
+  game.toggleRide('skate');
+  ok('skateboard ride on', game.player.ride === 'skate');
+  game.toggleRide('skate');
+  game.toggleRide('bike');
+  ok('bike ride on', game.player.ride === 'bike' && game.rideKind === 'bike');
+  const z1 = game.player.z;
+  game.keys.add('KeyW');
+  for (let i = 0; i < 40; i++) game._frame();
+  game.keys.delete('KeyW');
+  ok('bike is fast', Math.abs(game.player.z - z1) > 3);
+  game.toggleRide('bike');
+  ok('ride off', game.player.ride === null);
+  game.ui.raceHUD({ show: true, mode: 'تایم‌تریل', lap: 1, laps: 3, time: 1.2, best: null, pos: 1, rivals: 1, offTrack: false, cp: 0, cps: 8 });
+  game.ui.raceHUD({ show: false });
+  game.ui.showCountdown('۳');
+  game.ui.showCountdown(null);
+  game.ui.raceResults({ mode: 'تایم‌تریل', pos: 1, total: 1, time: 90, best: 30, laps: [30, 31, 29], rewards: { coins: 120, score: 300 }, win: true }, () => {}, () => {});
+  ok('race results panel', game.ui.isOpen('race-results'));
+  game.ui.closePanel('race-results');
+  const md = game.world.getMapData();
+  ok('map exposes bounds 128', md.bounds === 128);
+  ok('map exposes track paths', (md.paths || []).length >= 1);
+  ok('map minimap static built', !!game.ui._mapStatic);
+
   console.log('== save/load ==');
   game.saveGame(true);
   const { hasSave, loadSave } = await import(pathToFileURL(path.join(tmp, 'save.js')).href);
   ok('hasSave', hasSave());
   const d = loadSave();
   ok('save has player+missions', !!(d && d.player && d.missions && d.taken && d.vehicles));
+  ok('save has expansion systems', !!(d.weather && d.grades && d.story && d.racing && d.achievements && d.animals && d.flags));
+  game.grades.loadState(game.grades.stateForSave());
+  game.story.loadState(game.story.stateForSave());
+  game.weather.loadState(game.weather.stateForSave());
+  ok('expansion state roundtrips', game.grades.studySessions >= 1 && game.story.stateOf('welcome_tour') === 'done');
   game.missions.loadState(game.missions.stateForSave());
   ok('mission state roundtrip', true);
 

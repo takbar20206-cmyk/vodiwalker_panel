@@ -253,3 +253,110 @@ html, body {
   .game-title { font-size: 34px; }
   .help-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   پنل‌های گسترش: پیست، کارنامه، دفترچه، دستاوردها، امتحان
+   ============================================================ */
+.sl-overlay { position: fixed; inset: 0; background: rgba(6,10,20,0.68); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; z-index: 60; }
+.sl-panel { width: min(760px, 94vw); max-height: 88vh; overflow: hidden; display: flex; flex-direction: column;
+  background: linear-gradient(180deg, rgba(22,30,48,0.98), rgba(14,20,34,0.98)); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 20px; box-shadow: 0 24px 60px rgba(0,0,0,0.55); color: #eef3ff; }
+.sl-head { padding: 16px 22px 10px; border-bottom: 1px solid rgba(255,255,255,0.09); }
+.sl-head h2 { margin: 0 0 4px; font-size: 21px; }
+.sl-head-sub { font-size: 13px; color: #9fb0cc; line-height: 1.9; }
+.sl-body { padding: 14px 22px; overflow-y: auto; text-align: right; }
+.sl-body.wide { padding-bottom: 4px; }
+.sl-foot { padding: 12px 22px 18px; display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.sl-mut { color: #93a3bf; font-size: 13px; line-height: 1.9; }
+.sl-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sl-card { background: rgba(255,255,255,0.05); border-radius: 14px; padding: 10px 14px; }
+.sl-card h3 { margin: 4px 0 8px; font-size: 15px; color: #ffd77a; }
+.sl-row { display: flex; justify-content: space-between; font-size: 14px; padding: 5px 0; border-bottom: 1px dashed rgba(255,255,255,0.08); }
+.sl-row:last-child { border-bottom: 0; }
+
+/* پیست */
+.race-modes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.race-mode { cursor: pointer; text-align: right; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px; padding: 14px 16px; color: inherit; font-family: inherit; transition: 0.15s; }
+.race-mode:hover { background: rgba(90,140,255,0.18); border-color: #7ea8ff; transform: translateY(-2px); }
+.rm-icon { font-size: 26px; }
+.rm-name { font-weight: 700; font-size: 17px; margin: 4px 0; }
+.rm-desc { font-size: 13px; color: #a9b8d4; line-height: 1.8; }
+.rm-best { font-size: 12px; color: #ffd77a; margin-top: 6px; }
+#race-hud { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); min-width: 320px;
+  background: rgba(10,16,28,0.82); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; padding: 10px 16px;
+  color: #eef3ff; z-index: 40; text-align: center; font-variant-numeric: tabular-nums; }
+#race-hud .rh-row { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; }
+#race-hud .rh-row.big { font-size: 20px; font-weight: 700; margin: 4px 0; }
+#race-hud .rh-time { color: #ffd77a; }
+#race-hud .rh-row.small { font-size: 11.5px; color: #a9b8d4; }
+#race-hud .rh-pos { color: #8ef0b0; }
+#race-hud .rh-warn { margin-top: 6px; color: #ff9a9a; font-size: 12px; font-weight: 700; }
+#countdown { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 50;
+  font-size: 130px; font-weight: 900; color: #fff; text-shadow: 0 10px 40px rgba(0,0,0,0.6); pointer-events: none; }
+#countdown.pop { animation: cdpop 0.5s ease-out; }
+@keyframes cdpop { 0% { transform: scale(0.4); opacity: 0; } 45% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 0.92; } }
+
+/* دستاوردها */
+.ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.ach-card { display: flex; gap: 10px; background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.09); border-radius: 14px; padding: 10px 12px; }
+.ach-card.on { border-color: #ffd34d80; background: rgba(255,211,77,0.11); }
+.ach-icon { font-size: 24px; }
+.ach-name { font-weight: 700; font-size: 14px; }
+.ach-desc { font-size: 12px; color: #a9b8d4; line-height: 1.7; margin: 2px 0 4px; }
+.ach-date { font-size: 11px; color: #8ef0b0; }
+.ach-bar { height: 6px; border-radius: 6px; background: rgba(255,255,255,0.14); overflow: hidden; }
+.ach-bar i { display: block; height: 100%; background: linear-gradient(90deg, #59c1ff, #8ef0b0); }
+
+/* دفترچه داستان */
+.j-wrap { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.j-chapter { background: rgba(255,255,255,0.04); border-radius: 14px; padding: 10px 14px; }
+.j-chapter.locked { opacity: 0.55; }
+.j-chapter h3 { margin: 4px 0 8px; font-size: 15px; color: #ffd77a; }
+.j-quest { border-right: 3px solid #4a5878; padding: 6px 10px; margin-bottom: 8px; background: rgba(0,0,0,0.18); border-radius: 8px; }
+.j-quest.qactive { border-right-color: #ffd77a; }
+.j-quest.qdone { border-right-color: #8ef0b0; opacity: 0.8; }
+.jq-title { font-weight: 700; font-size: 14px; }
+.jq-desc { font-size: 12.5px; color: #a9b8d4; line-height: 1.8; }
+.jq-obj { font-size: 12.5px; color: #8ec9ff; }
+.jq-meta { font-size: 11.5px; color: #8d9bb6; }
+
+/* کارنامه و امتحان */
+.gr-list { display: flex; flex-direction: column; gap: 8px; }
+.gr-row { display: grid; grid-template-columns: 150px 1fr 60px 90px; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.05); border-radius: 12px; padding: 8px 12px; font-size: 14px; }
+.gr-know { position: relative; height: 16px; background: rgba(255,255,255,0.12); border-radius: 8px; overflow: hidden; }
+.gr-know i { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #59c1ff, #8ef0b0); }
+.gr-know b { position: relative; font-size: 11px; line-height: 16px; padding: 0 8px; }
+.gr-grade { text-align: center; font-weight: 700; }
+.gr-grade.good { color: #8ef0b0; } .gr-grade.ok { color: #ffd77a; } .gr-grade.bad { color: #ff9a9a; }
+.ex-head { font-size: 15px; color: #ffd77a; margin-bottom: 8px; }
+.ex-q { font-size: 19px; font-weight: 700; line-height: 2; margin-bottom: 12px; }
+.ex-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ex-opt { cursor: pointer; font-family: inherit; font-size: 15px; color: inherit; text-align: right;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); border-radius: 12px; padding: 12px 14px; transition: 0.15s; }
+.ex-opt:hover { background: rgba(90,140,255,0.2); border-color: #7ea8ff; }
+.ex-time { margin-top: 12px; height: 8px; border-radius: 8px; background: rgba(255,255,255,0.12); overflow: hidden; }
+.ex-time i { display: block; height: 100%; background: linear-gradient(90deg, #8ef0b0, #ffd77a); }
+.ex-res { font-size: 44px; text-align: center; }
+.ex-score { font-size: 40px; font-weight: 900; text-align: center; color: #ffd77a; margin-bottom: 8px; }
+.ex-score span { font-size: 14px; color: #a9b8d4; margin-inline-start: 8px; }
+.ex-pass { color: #8ef0b0; text-align: center; font-weight: 700; }
+.ex-fail { color: #ff9a9a; text-align: center; font-weight: 700; }
+
+@media (max-width: 720px) {
+  .race-modes { grid-template-columns: 1fr; }
+  .sl-cols { grid-template-columns: 1fr; }
+  .ex-opts { grid-template-columns: 1fr; }
+  .gr-row { grid-template-columns: 1fr 1fr; }
+  #countdown { font-size: 84px; }
+}
+
+/* ویجت آب‌وهوا */
+#weather-chip { position: fixed; top: 96px; left: 50%; transform: translateX(-50%); z-index: 30;
+  background: rgba(12,18,30,0.7); border: 1px solid rgba(255,255,255,0.14); border-radius: 999px;
+  padding: 5px 14px; color: #eef3ff; font-size: 13px; pointer-events: none; }
+#weather-chip.night { background: rgba(10,14,34,0.8); color: #cfe0ff; }
+
+/* نشانگر اهرم‌ها در راهنما */
+.gear-tag { display: inline-block; background: rgba(255,255,255,0.1); border-radius: 8px; padding: 2px 8px; margin-inline-start: 6px; font-size: 12px; }

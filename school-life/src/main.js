@@ -5,14 +5,24 @@
 import * as THREE from 'three';
 import { settings } from './settings.js';
 import { hasSave, loadSave, storeSave, clearSave } from './save.js';
-import { clamp, faNum, dist2D } from './utils.js';
-import { World, LOC } from './world.js';
+import { clamp, faNum, dist2D, choice, rand } from './utils.js';
+import { World, LOC, areaOf } from './world.js';
+import { buildExtension, EXT } from './world_ext.js';
 import { NPCManager } from './npc.js';
 import { Player } from './player.js';
 import { VehicleManager } from './vehicles.js';
 import { MissionManager, MISSION_TITLES } from './missions.js';
 import { UI } from './ui.js';
 import { AudioSys } from './audio.js';
+import { Weather, WEATHER_LABEL, weatherIcon } from './weather.js';
+import { AnimalManager } from './animals.js';
+import { Music } from './music.js';
+import { Voice } from './voice.js';
+import { Achievements } from './achievements.js';
+import { RaceManager, RACE_MODES } from './racing.js';
+import { GradeBook } from './grades.js';
+import { StoryManager } from './story.js';
+import { PartySystem } from './party.js';
 
 const DAY_LENGTH = 720; // ثانیه برای یک شبانه‌روز کامل
 
@@ -44,6 +54,14 @@ class Game {
     this._kicker = null;
     this._startedAt = 0;
     this.outdoorLightsOn = true;
+    this.hasBicycle = true;      // دوچرخه در تعمیرگاه
+    this.hasSkateboard = false;
+    this.rideKind = null;
+    this.partyOn = false;
+    this._dayIndex = 0;
+    this._distAcc = 0;
+    this._lastPX = 0; this._lastPZ = 0;
+    this.weatherMode = 'auto';
   }
 
   /* ================= راه‌اندازی ================= */
@@ -89,7 +107,10 @@ class Game {
 
     // دنیا (بارگذاری مرحله‌ای)
     this.world = new World(this.scene);
-    await this.world.build((p, m) => this.ui.setLoad(3 + p * 0.72, m));
+    await this.world.build((p, m) => this.ui.setLoad(3 + p * 0.4, m));
+
+    this.ui.setLoad(44, 'گسترش دنیا: شهر، استخر، آزمایشگاه، خوابگاه...');
+    await buildExtension(this.world, (p, m) => this.ui.setLoad(44 + p * 0.38, m), this._extHooks());
 
     this.ui.setLoad(78, 'آوردن دانش‌آموزان و معلم‌ها...');
     await this._tick();
@@ -112,6 +133,7 @@ class Game {
       vehicles: this.vehicles, ui: this.ui, audio: this.audio, game: this,
     });
     this.missions.init();
+    this._buildSystems();
     this.ui.initMinimap(this.world.getMapData());
     this.ui.updateMuteBtn();
 
@@ -199,6 +221,12 @@ class Game {
       else if (this.ui.isOpen('shop')) this.ui.closeShop();
       else if (this.ui.isOpen('settings')) this.ui.closeSettings();
       else if (this.ui.isOpen('help')) this.ui.closeHelp();
+      else if (this.ui.isOpen('race-menu')) this.ui.closePanel('race-menu');
+      else if (this.ui.isOpen('achievements')) this.ui.closePanel('achievements');
+      else if (this.ui.isOpen('journal')) this.ui.closePanel('journal');
+      else if (this.ui.isOpen('grades')) this.ui.closePanel('grades');
+      else if (this.ui.isOpen('race-results')) this.ui.closePanel('race-results');
+      else if (this.ui.isOpen('exam-result')) this.ui.closePanel('exam-result');
       return;
     }
     if (e.code === 'Tab' || e.code === 'KeyM') { if (!e.repeat) this.toggleBigmap(); return; }
@@ -210,6 +238,20 @@ class Game {
     }
     if (e.code === 'KeyE' && !e.repeat) { this.doInteract(); return; }
     if (e.code === 'Space' && !e.repeat) { this.jumpQueued = true; return; }
+    // کلیدهای گسترش
+    if (e.code === 'KeyR' && !e.repeat) {
+      if (this.racing && (this.racing.state === 'racing' || this.racing.state === 'countdown')) this.racing.abort();
+      else this.openRaceMenu();
+      return;
+    }
+    if (e.code === 'KeyK' && !e.repeat) { if (this.grades) this.grades.openPanel(); return; }
+    if (e.code === 'KeyJ' && !e.repeat) { if (this.story) this.story.openJournal(); return; }
+    if (e.code === 'KeyG' && !e.repeat) { if (this.achievements) this.achievements.open(); return; }
+    if (e.code === 'KeyU' && !e.repeat) { if (this.party) this.party.dance(); return; }
+    if (e.code === 'KeyC' && !e.repeat) { this.toggleRide('skate'); return; }
+    if (e.code === 'KeyB' && !e.repeat) { this.toggleRide('bike'); return; }
+    if (e.code === 'KeyN' && !e.repeat) { this.cycleWeather(); return; }
+    if (e.code === 'KeyV' && !e.repeat) { this.cycleVoice(); return; }
     this.keys.add(e.code);
   }
 
@@ -276,6 +318,21 @@ class Game {
         this.world.setTaken('coin', d.taken.coins || []);
       }
       if (d.vehicles) this.vehicles.loadState(d.vehicles);
+      if (d.weather) this.weather.loadState(d.weather);
+      if (d.weatherMode) { this.weatherMode = d.weatherMode; this.weather.set(d.weatherMode, true); }
+      if (d.animals) this.animals.loadState(d.animals);
+      if (d.achievements) this.achievements.loadState(d.achievements);
+      if (d.racing) this.racing.loadState(d.racing);
+      if (d.grades) this.grades.loadState(d.grades);
+      if (d.story) this.story.loadState(d.story);
+      if (d.party) this.party.loadState(d.party);
+      if (d.flags) {
+        this.hasSkateboard = !!d.flags.hasSkateboard;
+        this.hasBicycle = d.flags.hasBicycle !== false;
+        this._dayIndex = d.flags.dayIndex || 0;
+        this.rideKind = null;
+        this._updateRide();
+      }
       // فاز NPCها با ساعت ذخیره همگام شود
       this.npcs.lastPhase = null;
     } catch (e) { console.warn('load failed', e); }
@@ -346,6 +403,226 @@ class Game {
     location.reload();
   }
 
+  /* ================= تعامل با دنیای گسترش‌یافته ================= */
+  _extHooks() {
+    return {
+      openShop: (id) => this.openShop(id),
+      enter: (id) => this.ui.toast('وارد شدی: ' + id),
+      fastTravel: (id) => this.fastTravel(id),
+      bus: () => this.busTour(),
+      notice: (t) => this.ui.toast(t),
+      board: (id) => this.readBoard(id),
+      vending: () => this.buyVending(),
+      atm: () => this.withdrawATM(),
+      recycle: () => this.sortTrash(),
+      sleep: () => this.sleepInDorm(),
+      kite: () => this.toggleKite(),
+      skate: () => this.giveSkateboard(),
+      microscope: () => this.useMicroscope(),
+      lab: () => this.doLabExperiment(),
+      cafeteria: () => this.eatCafeteria(),
+      race: () => this.openRaceMenu(),
+    };
+  }
+
+  _shopItems(kind) {
+    const S = {
+      super: [
+        { id: 'juice', name: 'آبمیوه', desc: '+۴۰ انرژی', price: 8 },
+        { id: 'sandwich', name: 'ساندویچ', desc: '+۳۰ جان و +۲۰ انرژی', price: 12 },
+        { id: 'water', name: 'بطری آب', desc: '+۲۰ انرژی', price: 5 },
+      ],
+      pizza: [
+        { id: 'pizza', name: 'پیتزا', desc: 'شام خوشمزه! (+۴۰ جان)', price: 18 },
+        { id: 'juice', name: 'نوشابه', desc: '+۴۰ انرژی', price: 8 },
+      ],
+      ice: [
+        { id: 'ice', name: 'بستنی', desc: 'خنک و شاد! (+۱۵ انرژی)', price: 9 },
+      ],
+      book: [
+        { id: 'notebook', name: 'دفتر مشق', desc: 'برای امتحان‌ها (+۵ دانش)', price: 10 },
+        { id: 'book', name: 'کتاب داستان', desc: 'سرگرمی سالم', price: 12 },
+      ],
+      toy: [
+        { id: 'kite', name: 'بادبادک', desc: 'پرواز در پارک شهر!', price: 15 },
+        { id: 'ball', name: 'توپ پلاستیکی', desc: 'بازی در حیاط', price: 10 },
+      ],
+      clinic: [
+        { id: 'medkit', name: 'جَعبهٔ کمک‌های اولیه', desc: 'جان کامل', price: 20 },
+      ],
+      cafe: [
+        { id: 'coffee', name: 'قهوه', desc: '+۵۰ انرژی', price: 12 },
+        { id: 'cake', name: 'کیک', desc: 'برای جشن (+۲۰ جان)', price: 14 },
+      ],
+    };
+    return S[kind] || S.super;
+  }
+
+  openShop(id) {
+    const items = this._shopItems(id);
+    this.audio.play('open');
+    this.ui.shop(items, this.coins, (item) => this.buyShopItem(item), EXT.shops.find((s) => s.id === id) ? EXT.shops.find((s) => s.id === id).name : 'فروشگاه');
+  }
+
+  buyShopItem(item) {
+    if (this.coins < item.price) {
+      this.audio.play('error');
+      this.ui.toast('سکهٔ کافی نداری! (' + faNum(item.price) + ' سکه لازم است)');
+      return;
+    }
+    this.addCoins(-item.price);
+    if (item.id === 'medkit') { this.hp = 100; this.en = 100; }
+    else if (item.id === 'kite') { this.animals && this.animals.toggleKite(); }
+    else if (item.id === 'notebook') { this.grades && this.grades.addKnowledge(5); }
+    else if (item.id === 'ball') { this.world.resetBall(); }
+    else this.inv[item.id] = (this.inv[item.id] || 0) + 1;
+    this.audio.play('coin');
+    this.ui.toast(item.name + ' خریدی! (' + faNum(this.coins) + ' سکه مانده)');
+    this.ui.shopCoins(this.coins);
+    if (this.achievements) { this.achievements.bump('shops', 1); this.achievements.bump('travel', 0); }
+  }
+
+  fastTravel(id) {
+    const spot = EXT.fastTravel.find((f) => f.id === id);
+    if (!spot) return;
+    if (this.vehicles.active) { this.ui.toast('اول از خودرو پیاده شو!'); return; }
+    this.player.pos.set(spot.x, 0, spot.z);
+    this.player.yaw = 0;
+    this.audio.play('open');
+    this.ui.toast('سفر سریع: ' + spot.name + ' 🚌');
+  }
+
+  busTour() {
+    this.addScore(10);
+    this.ui.banner('اتوبوس شهر', 'گشتی در شهر آفتاب زدی! مسیرها را یاد گرفتی.');
+    this.fastTravel('city');
+    this.audio.play('open');
+    if (this.achievements) this.achievements.bump('bus', 1);
+  }
+
+  readBoard(id) {
+    const msgs = {
+      city: ['📣 جشنوارهٔ پاییزی شهر، جمعه در پارک شهر!', '📣 فروشگاه‌ها امروز تخفیف دارند.', '📣 کلاس زبان انگلیسی شهر هنوز جا دارد.'],
+      dorm: ['🛏 ساعت خواب خوابگاه: ۲۲:۳۰', '🧺 روز رخت‌شویی: دوشنبه‌ها', '🍳 صبحانه ساعت ۷ تا ۸'],
+    };
+    const list = msgs[id] || msgs.city;
+    this.ui.banner('تابلوی اعلانات', choice(list));
+    this.audio.play('talk');
+  }
+
+  buyVending() {
+    if (this.coins < 5) { this.audio.play('error'); this.ui.toast('۵ سکه لازم است!'); return; }
+    this.addCoins(-5);
+    this.inv.juice = (this.inv.juice || 0) + 1;
+    this.audio.play('coin');
+    this.ui.toast('یک نوشیدنی خنک خریدی! 🥤');
+  }
+
+  withdrawATM() {
+    const day = Math.floor(this.timeH);
+    if (this._atmDay === this._dayIndex) { this.audio.play('error'); this.ui.toast('امروز پول برداشت کردی — فردا بیا!'); return; }
+    this._atmDay = this._dayIndex;
+    this.addCoins(20);
+    this.audio.play('coin');
+    this.ui.toast('۲۰ سکه برداشت شد! 🏧');
+    void day;
+  }
+
+  sortTrash() {
+    this.addCoins(3);
+    this.addScore(5);
+    this.audio.play('pickup');
+    this.ui.toast('زباله‌ها را جدا کردی! +۳ سکه ♻️');
+    if (this.achievements) this.achievements.bump('recycle', 1);
+  }
+
+  sleepInDorm() {
+    this.timeH = 7;
+    this.hp = 100;
+    this.en = 100;
+    this._dayIndex = (this._dayIndex || 0) + 1;
+    this.npcs.lastPhase = null;
+    this.audio.play('complete');
+    this.ui.banner('صبح بخیر!', 'شب را در خوابگاه خوابیدی — جان و انرژی کامل شد.');
+    this.saveGame(true);
+  }
+
+  toggleKite() {
+    if (!this.animals) return;
+    const on = this.animals.toggleKite();
+    this.ui.toast(on ? 'بادبادک در آسمان است! 🪁' : 'بادبادک را جمع کردی.');
+  }
+
+  giveSkateboard() {
+    this.hasSkateboard = true;
+    this.ui.toast('تخته‌اسکیت گرفتی! کلید C برای سوار شدن 🛹');
+    this.audio.play('quest');
+  }
+
+  useMicroscope() {
+    if (this.world.sparkles) this.world.sparkles.spawn(44, 1.2, -4.2, 0x9fd2ee, 14, { spread: 1.4, up: 2, life: 0.7 });
+    this.audio.play('click');
+    this.ui.toast('زیر میکروسکوپ: سلول‌های برگ! 🔬 +۵ دانش');
+    if (this.grades) this.grades.addKnowledge(5);
+  }
+
+  doLabExperiment() {
+    const colors = [0x4dd4ff, 0xffd23f, 0xff6b9d, 0x7cff6b];
+    for (let i = 0; i < 4; i++) {
+      if (this.world.sparkles) this.world.sparkles.spawn(46.5 + rand(-1, 1), 1.3, -14.5 + rand(-1, 1), colors[i], 10, { spread: 2, up: 3.4, life: 1.1 });
+    }
+    this.audio.play('secret');
+    this.ui.toast('آزمایش موفق بود! 🧪 +۸ دانش');
+    if (this.grades) this.grades.addKnowledge(8);
+    if (this.achievements) this.achievements.bump('labs', 1);
+  }
+
+  eatCafeteria() {
+    this.audio.play('open');
+    this.ui.shop([
+      { id: 'meal', name: 'غذای روز', desc: 'جان و انرژی کامل', price: 14 },
+      { id: 'cake', name: 'دسر', desc: '+۲۰ جان', price: 9 },
+      { id: 'juice', name: 'نوشیدنی', desc: '+۴۰ انرژی', price: 6 },
+    ], this.coins, (item) => {
+      if (this.coins < item.price) { this.audio.play('error'); this.ui.toast('سکهٔ کافی نداری!'); return; }
+      this.addCoins(-item.price);
+      if (item.id === 'meal') { this.hp = 100; this.en = 100; }
+      else if (item.id === 'cake') this.hp = clamp(this.hp + 20, 0, 100);
+      else this.en = clamp(this.en + 40, 0, 100);
+      this.audio.play('eat');
+      this.ui.toast(item.name + ' خوردی! 😋');
+    }, 'سالن غذاخوری');
+  }
+
+  openRaceMenu() {
+    if (this.racing && this.racing.track) { this.racing.openMenu(); return; }
+    if (this.ui.raceMenu) {
+      this.ui.raceMenu(RACE_MODES.map((m) => ({ ...m, best: '—' })), (id) => this.ui.toast('پیست آماده نیست (' + id + ')'));
+      return;
+    }
+    this.ui.toast('پیست به‌زودی باز می‌شود! 🏁');
+  }
+
+  /* ================= آب‌وهوا و صدا ================= */
+  cycleWeather() {
+    const order = ['auto', 'clear', 'cloudy', 'rain', 'storm', 'snow', 'fog'];
+    const i = order.indexOf(this.weather.mode);
+    const next = order[(i + 1) % order.length];
+    this.weather.set(next, false);
+    this.weatherMode = next;
+    this.ui.toast('آب‌وهوا: ' + weatherIcon(next) + ' ' + (WEATHER_LABEL[next] || next));
+    this.audio.play('click');
+  }
+
+  cycleVoice() {
+    const order = ['tts', 'babble', 'off'];
+    const i = order.indexOf(this.voice.mode);
+    const next = order[(i + 1) % order.length];
+    this.voice.setMode(next);
+    this.ui.toast('حالت دوبله: ' + (next === 'tts' ? 'صداپیشگی مرورگر 🔊' : next === 'babble' ? 'نجواگرا 🗣' : 'خاموش 🔇'));
+    this.audio.play('click');
+  }
+
   /* ================= تعامل ================= */
   doInteract() {
     if (this.state !== 'playing' || this.paused || this.ui.modalOpen) return;
@@ -367,6 +644,8 @@ class Game {
       t.ref.action();
     } else if (t.type === 'npc') {
       t.ref.onTalk(t.ref);
+    } else if (t.type === 'animal') {
+      this.petAnimal();
     } else if (t.type === 'vehicle') {
       const v = t.ref;
       if (v.locked) {
@@ -404,6 +683,14 @@ class Game {
       const d = dist2D(px, pz, npc.group.position.x, npc.group.position.z);
       if (d < bd) { bd = d; best = { type: 'npc', ref: npc }; }
     }
+    // حیوان نزدیک
+    if (this.animals) {
+      const a = this.animals.nearest(px, pz, 2.6);
+      if (a) {
+        const d = dist2D(px, pz, a.x, a.z);
+        if (d < bd) { bd = d; best = { type: 'animal', ref: a }; }
+      }
+    }
     // خودرو
     const v = this.vehicles.nearest(px, pz, 3.4);
     if (v) {
@@ -415,6 +702,7 @@ class Game {
     let txt = '';
     if (best.type === 'pickup') txt = best.ref.prompt;
     else if (best.type === 'npc') txt = 'صحبت با ' + best.ref.name;
+    else if (best.type === 'animal') txt = 'غذا دادن / نوازش ' + (best.ref.name || 'حیوان');
     else txt = best.ref.locked ? best.ref.name + ' (قفل است)' : 'سوار شدن: ' + best.ref.name;
     this.ui.prompt('<span class="key">E</span> — ' + txt);
   }
@@ -435,6 +723,7 @@ class Game {
       npcs: this.npcs.mapPoints(),
       vehicles: this.vehicles.mapPoints(),
       targets: this.missions.targets(),
+      animals: this.animals ? this.animals.mapPoints() : [],
       ball: { x: b.x, z: b.z },
     };
   }
@@ -452,6 +741,15 @@ class Game {
       missions: this.missions.stateForSave(),
       taken: { pickups: takenP, coins: takenC },
       vehicles: this.vehicles.stateForSave(),
+      weather: this.weather.stateForSave(),
+      weatherMode: this.weatherMode,
+      animals: this.animals.stateForSave(),
+      achievements: this.achievements.stateForSave(),
+      racing: this.racing.stateForSave(),
+      grades: this.grades.stateForSave(),
+      story: this.story.stateForSave(),
+      party: this.party.stateForSave(),
+      flags: { hasSkateboard: this.hasSkateboard, hasBicycle: this.hasBicycle, dayIndex: this._dayIndex, ride: this.rideKind },
     });
     if (!silent) {
       if (ok) { this.ui.toast('بازی ذخیره شد!'); this.audio.play('quest'); }
@@ -487,6 +785,142 @@ class Game {
     this.outdoorLightsOn = q !== 'low';
     if (this.world) this.world.setQuality(q);
     if (this.npcs) this.npcs.setQuality(q);
+    if (this.weather) this.weather.setQuality(q);
+    if (this.animals) this.animals.setQuality(q);
+    if (this.music) this.music.applySettings();
+    if (this.voice) this.voice.applySettings();
+  }
+
+  /* ================= ساخت سیستم‌های گسترش ================= */
+  _buildSystems() {
+    const ctx = { ui: this.ui, audio: this.audio, game: this, world: this.world, npcs: this.npcs, player: this.player, missions: this.missions, vehicles: this.vehicles, settings: this.settings, scene: this.scene };
+    this.weather = new Weather(this.scene, this.world, this.audio, this.settings);
+    this.animals = new AnimalManager(this.scene, this.world, this.audio, this.npcs);
+    this.animals.build();
+    this.music = new Music(this.audio, this.settings);
+    this.voice = new Voice(this.settings, this.audio);
+    this.achievements = new Achievements({ ui: this.ui, audio: this.audio, game: this });
+    this.grades = new GradeBook({ ui: this.ui, audio: this.audio, game: this, world: this.world, achievements: this.achievements });
+    this.racing = new RaceManager({ ...ctx, music: this.music, achievements: this.achievements, onRaceFinish: (x) => this.onRaceFinish(x) });
+    this.party = new PartySystem({ ...ctx, animals: this.animals, music: this.music });
+    this.story = new StoryManager({ ...ctx, grades: this.grades, racing: this.racing, party: this.party, animals: this.animals, weather: this.weather, achievements: this.achievements });
+    this.story.init();
+    this.racing.build();
+    // دوچرخه و تخته‌اسکیت در انبار بازیکن
+    this._updateRide();
+  }
+
+  /* ================= دوچرخه و تخته‌اسکیت ================= */
+  giveBicycle() {
+    this.hasBicycle = true;
+    this.ui.toast('دوچرخه داری! کلید B برای سوار شدن 🚲');
+    this.audio.play('quest');
+    if (this.achievements) this.achievements.bump('travel', 0);
+  }
+
+  toggleRide(kind) {
+    if (this.rideKind === kind) { this.rideKind = null; }
+    else {
+      if (kind === 'bike' && !this.hasBicycle) { this.ui.toast('اول دوچرخه را از تعمیرگاه بگیر! (آقای فرید)'); this.audio.play('error'); return; }
+      if (kind === 'skate' && !this.hasSkateboard) { this.ui.toast('اول تخته‌اسکیت بگیر! (پارک اسکیت)'); this.audio.play('error'); return; }
+      this.rideKind = kind;
+    }
+    if (this.vehicles.active) { this.ui.toast('اول از خودرو پیاده شو!'); this.rideKind = null; return; }
+    this._updateRide();
+    this.audio.play('open');
+    const names = { bike: 'دوچرخه 🚲', skate: 'تخته‌اسکیت 🛹' };
+    this.ui.toast(this.rideKind ? 'سوار ' + names[this.rideKind] + ' شدی! (برای پیاده شدن دوباره همان کلید)' : 'پیاده شدی.');
+  }
+
+  _updateRide() {
+    if (this.player && this.player.setRide) this.player.setRide(this.rideKind);
+  }
+
+  /* ================= تماس با حیوانات ================= */
+  petAnimal() {
+    const a = this.animals && this.animals.nearest(this.player.x, this.player.z, 3);
+    if (!a) { this.ui.toast('حیوانی نزدیک نیست.'); return; }
+    if (a.kind === 'cat' || a.kind === 'dog' || a.kind === 'rabbit') {
+      if (this.animals.feed) this.animals.feed(a, 'fish');
+      if (this.animals.pet) this.animals.pet(a);
+      this.ui.toast(a.name ? ('به ' + a.name + ' غذا دادی! 🐟') : 'حیوان را نوازش کردی!');
+    } else {
+      this.ui.toast('این حیوان را نمی‌شود نوازش کرد — تماشایش کن! 🐦');
+    }
+    if (this.achievements) { this.achievements.bump('fed', 1); this.achievements.bump('pets', 1); }
+  }
+
+  /* ================= ریزفعالیت‌های جهان: حلقه‌ها، ریل، شیرجه، آدم‌برفی ================= */
+  _updateExtras(dt, px, pz) {
+    const ext = this.world.ext;
+    if (!ext || !this.player) return;
+    const p = this.player;
+    const riding = !!this.rideKind;
+
+    // ۱) حلقه‌های پارک اسکیت
+    for (const h of ext.hoops) {
+      if (h.taken) continue;
+      if (dist2D(px, pz, h.x, h.z) < 1.7 && p.pos.y < 2.6) {
+        h.taken = true;
+        h.mesh.visible = false;
+        this.audio.play('goal');
+        if (this.world.sparkles) this.world.sparkles.spawn(h.x, 1.4, h.z, 0xffd34d, 18, { spread: 2, up: 4, life: 0.9 });
+        if (this.achievements) this.achievements.bump('hoops', 1);
+        this.ui.toast('از حلقه گذشتی! 🎯' + (this.rideKind === 'skate' ? ' (ترفند اسکیت)' : ''));
+        this.story && this.story.ctx.missions.refreshMarkers();
+      }
+    }
+
+    // ۲) سُر خوردن روی ریل‌های پارک
+    const rail = ext.railAt && ext.railAt(px, pz);
+    if (rail && riding && p.pos.y > 0.2) {
+      this._railT = (this._railT || 0) + dt;
+      if (this._railT > 0.7 && !this._railDone) {
+        this._railDone = true;
+        if (this.achievements) this.achievements.bump('rails', 1);
+        this.audio.play('kick');
+        this.ui.toast('روی ریل سر خوردی! ⚡');
+      }
+    } else { this._railT = 0; this._railDone = false; }
+
+    // ۳) پرش از تختهٔ شیرجه استخر
+    const board = ext.pool && ext.pool.board;
+    if (board && !p.grounded && dist2D(px, pz, board.x, board.z) < 2.4 && p.pos.y > 2.2) {
+      if (!this._diveT) {
+        this._diveT = 1;
+        this.audio.play('splash');
+        if (this.achievements) this.achievements.bump('dives', 1);
+        this.ui.toast('شیرجه زدی! 🤿');
+      }
+    } else if (p.grounded) this._diveT = 0;
+
+    // ۴) آدم‌برفی
+    if (this.weather.snow01 > 0.5 && dist2D(px, pz, -8, 30) < 3) {
+      if (this.achievements) this.achievements.bump('snowman', 1);
+    }
+
+    // ۵) سفر سریع: شمارش نقاط دیده‌شده
+    const near = ext.nearestFastTravel && ext.nearestFastTravel(px, pz);
+    if (near) {
+      this._travelSeen = this._travelSeen || new Set();
+      if (!this._travelSeen.has(near.id)) {
+        this._travelSeen.add(near.id);
+        if (this.achievements) this.achievements.bump('travel', 1);
+        this.ui.toast('نقطهٔ سفر سریع کشف شد: ' + near.name + ' (' + faNum(this._travelSeen.size) + '/۵)');
+      }
+    }
+
+    // ۶) ترفند اسکیت هنگام پرش
+    if (this.rideKind === 'skate' && this._sawJump) {
+      this._sawJump = false;
+      if (this.achievements) this.achievements.bump('tricks', 1);
+    }
+  }
+
+  /* ================= پایان مسابقه ================= */
+  onRaceFinish(x) {
+    if (this.story && this.story.onRaceFinish) this.story.onRaceFinish(x);
+    if (this.achievements && x && x.win && x.laps >= 3) this.achievements.unlock('racer');
   }
 
   /* ================= چرخه روز و شب ================= */
@@ -535,6 +969,7 @@ class Game {
       this.camera.lookAt(0, 1, -5);
       this.world.update(dt, { px: this.player.x, pz: this.player.z, kicker: null });
       this.npcs.update(dt, this.timeH, { x: this.player.x, z: this.player.z });
+      if (this.music) { this.music.update(dt); this.music.autoSelect({ state: 'menu', timeH: this.timeH }); }
     } else if (this.state === 'playing' && !this.paused) {
       this._step(dt);
     }
@@ -570,6 +1005,16 @@ class Game {
       this.vehicles.updateCamera(dt, this.camera);
     } else {
       const st = this.player.update(dt, input, this.world.colliders);
+      // رمپ‌ها و سطح آب استخر
+      const ext = this.world.ext;
+      if (ext) {
+        const rh = ext.rampHeightAt ? ext.rampHeightAt(this.player.x, this.player.z) : 0;
+        if (rh > 0 && this.player.pos.y < rh) { this.player.pos.y = rh; this.player.vy = Math.max(0, this.player.vy); this.player.grounded = true; }
+        if (ext.inPoolWater && ext.inPoolWater(this.player.x, this.player.z) && this.player.pos.y < 0.5) {
+          this.player.pos.y = 0.24;
+          if (!this._swimT && this.achievements) { /* شنا */ }
+        }
+      }
       this.player.updateCamera(dt, this.camera, this.world.colliders);
       moving = st.moving; sprinting = st.sprinting;
       // برخورد نرم با خودروها
@@ -619,10 +1064,49 @@ class Game {
     }
 
     // دنیا و NPC و مأموریت
-    this.world.update(dt, { px: driving ? this.vehicles.active.x : this.player.x, pz: driving ? this.vehicles.active.z : this.player.z, kicker: driving ? null : this._kicker });
+    const ppx = driving ? this.vehicles.active.x : this.player.x;
+    const ppz = driving ? this.vehicles.active.z : this.player.z;
+    this.world.update(dt, { px: ppx, pz: ppz, kicker: driving ? null : this._kicker });
     this.npcs.update(dt, this.timeH, { x: this.player.x, z: this.player.z });
     this.missions.update(dt);
     this.audio.update(dt, this._isDay);
+
+    /* ---------- گسترش: آب‌وهوا، حیوانات، موسیقی، صدا، دستاورد، پیست ---------- */
+    this.weather.update(dt, { timeH: this.timeH, px: ppx, pz: ppz });
+    if (this.world.ext && this.world.ext.updateVisuals) this.world.ext.updateVisuals(dt, this.timeH);
+    const wet = this.weather.isWet, snowy = this.weather.isSnow;
+    this.animals.update(dt, { px: ppx, pz: ppz, timeH: this.timeH, rain: wet, snow: snowy, camYaw: this.player.yaw });
+    this.grades.update(dt, { area: areaOf(ppx, ppz), timeH: this.timeH, x: ppx, z: ppz });
+    this.story.update(dt);
+    this.party.update(dt);
+    this.racing.update(dt);
+    this.music.update(dt);
+    this.music.autoSelect({
+      state: this.state,
+      racing: this.racing.state === 'racing' || this.racing.state === 'countdown',
+      party: this.party.active,
+      exam: !!this.grades.exam,
+      weatherTrack: this.weather.musicHint(),
+      timeH: this.timeH,
+    });
+    this.voice.update(dt);
+    this._sawJump = this._sawJump || (this.jumpQueued && this.player.grounded);
+    this._updateExtras(dt, ppx, ppz);
+    const moved = dist2D(this._lastPX, this._lastPZ, ppx, ppz);
+    this._distAcc += moved > 3 ? 0 : moved;
+    this._lastPX = ppx; this._lastPZ = ppz;
+    void this._distAcc;
+    this.achievements.update(dt, {
+      dist: moved > 3 ? 0 : moved,
+      driving,
+      sprinting,
+      swim: !driving && this.world.ext && this.world.ext.inPoolWater && this.world.ext.inPoolWater(ppx, ppz) && this.player.pos.y < 1.3,
+      rain: wet,
+      kite: !!this.animals.kiteOn,
+      coins: this.coins,
+      timeH: this.timeH,
+      gpa: this.grades.gpa(),
+    });
     this._scanInteract();
 
     // HUD (throttle)
@@ -636,6 +1120,7 @@ class Game {
       this.ui.setTracker(this.missions.tracker(), this.missions.completionPct());
       this.ui.setTimer(this.missions.getTimer());
       this.ui.setFps(this._fps);
+      this.ui.setWeather(this.weather.icon + ' ' + this.weather.label, this.timeH);
       this.ui.showLockHint(!this.pointerLocked && !this.ui.modalOpen && !this.paused);
     }
     this._mapT -= dt;

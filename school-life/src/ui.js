@@ -19,7 +19,13 @@ function phaseName(h) {
 const INV_NAMES = {
   books: 'کتاب', cans: 'قوطی', sandwich: 'ساندویچ', juice: 'آبمیوه',
   note: 'نامه فوری', bag: 'کوله‌پشتی سارا',
+  water: 'بطری آب', pizza: 'پیتزا', ice: 'بستنی', notebook: 'دفتر مشق',
+  book: 'کتاب داستان', coffee: 'قهوه', cake: 'کیک', medkit: 'جعبهٔ کمک‌های اولیه',
+  bread: 'نان', milk: 'شیر', balloon: 'بادکنک', speaker: 'بلندگو',
+  key: 'کلید آزمایشگاه', lostBook: 'کتاب گمشده', kite: 'بادبادک', ball: 'توپ',
 };
+const USABLE = new Set(['sandwich', 'juice', 'water', 'pizza', 'ice', 'coffee', 'cake']);
+const USE_VERB = { sandwich: 'خوردن', juice: 'نوشیدن', water: 'نوشیدن', pizza: 'خوردن', ice: 'خوردن', coffee: 'نوشیدن', cake: 'خوردن' };
 
 export class UI {
   constructor() {
@@ -158,6 +164,18 @@ export class UI {
     if (show) d.innerHTML = 'در حال رانندگی: <b>' + name + '</b> — خروج: <span class="key">E</span>';
   }
 
+  /** نمایش وضعیت آب‌وهوا در HUD */
+  setWeather(text, timeH) {
+    let el = document.getElementById('weather-chip');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'weather-chip';
+      document.body.appendChild(el);
+    }
+    el.textContent = text || '';
+    el.classList.toggle('night', timeH != null && (timeH >= 19 || timeH < 6));
+  }
+
   prompt(text) {
     const p = this.el.prompt;
     if (!p) return;
@@ -206,6 +224,16 @@ export class UI {
       btn.addEventListener('click', (e) => { e.stopPropagation(); this.game.audio.play('click'); o.fn(); });
       box.appendChild(btn);
     });
+    // دوبلهٔ فارسی متن گفت‌وگو
+    if (this.game && this.game.voice) {
+      let prof = 'student';
+      if (/آقای|خانم|مربی|مدیر|معاون|نگهبان|مسئول|آشپز|فروشنده|معلم|کتابدار/.test(name)) prof = 'teacher';
+      else if (/سارا|کیان|دنیا|نیما|دانش‌آموز|عابر|میلاد|شادی|بهنام|رؤیا|سینا|لیلا|امید|غزل|حسام|نیلوفر|آرمین|سارینا|فرزاد|آرش|کاوه|اهالی|شهروند/.test(name)) prof = 'student';
+      else if (/پیشی|گربه|بچه/.test(name)) prof = 'kid';
+      if (/سعید|بابک|پریسا|جوادی|کامران|لیلا/.test(name)) prof = 'seller';
+      if (/مربی/.test(name)) prof = 'coach';
+      this.game.voice.speak(text, prof);
+    }
     this.game.onModalOpen('dialogue');
   }
   chooseOption(i) {
@@ -218,6 +246,7 @@ export class UI {
     if (!this.isOpen('dialogue')) return;
     this._modals.delete('dialogue');
     this.el.dialogue.classList.add('hidden');
+    if (this.game.voice) this.game.voice.stop();
     this.game.audio.play('close');
     this.game.onModalClose('dialogue');
   }
@@ -264,9 +293,9 @@ export class UI {
     for (const k of keys) {
       const d = document.createElement('div');
       d.className = 'inv-item';
-      const usable = k === 'sandwich' || k === 'juice';
+      const usable = USABLE.has(k);
       d.innerHTML = '<div class="inv-name">' + INV_NAMES[k] + ' <span class="inv-count">×' + faNum(inv[k]) + '</span></div>' +
-        (usable ? '<button class="btn small">' + (k === 'sandwich' ? 'خوردن' : 'نوشیدن') + '</button>' : '<div class="inv-tag">مأموریت</div>');
+        (usable ? '<button class="btn small">' + USE_VERB[k] + '</button>' : '<div class="inv-tag">مأموریت</div>');
       if (usable) d.querySelector('button').addEventListener('click', (e) => { e.stopPropagation(); onUse(k); });
       box.appendChild(d);
     }
@@ -327,7 +356,16 @@ export class UI {
     this.el.help.classList.remove('hidden');
     // وضعیت مأموریت‌ها
     if (this.el['help-quests'] && this.game.missions) {
-      const rows = Object.keys(this.game.missions.st).map((id) => {
+      // پیشرفت داستان
+      let head = '';
+      if (this.game.story) {
+        const p = this.game.story.progress();
+        const j = this.game.story.journal();
+        const cur = j.chapters[Math.min(j.current, j.chapters.length - 1)];
+        head = '<div class="q-row"><span>📖 داستان: ' + faNum(p.pct) + '٪ (' + faNum(p.done) + '/' + faNum(p.total) + ')</span>' +
+          '<span class="q-active">' + (cur ? cur.title : '') + '</span></div>';
+      }
+      const rows = head + Object.keys(this.game.missions.st).filter((id) => !this.game.missions.dyn[id]).map((id) => {
         const m = this.game.missions.st[id];
         const st = m.st === 'done' ? '<span class="q-done">کامل شد</span>' : m.st === 'active' ? '<span class="q-active">فعال</span>' : '<span class="q-avail">قابل قبول</span>';
         return '<div class="q-row"><span>' + this.game.missionsTitle(id) + '</span>' + st + '</div>';
@@ -357,29 +395,32 @@ export class UI {
      ============================================================ */
   initMinimap(mapData) {
     this._mapData = mapData;
+    this._span = (mapData.bounds || 128) * 2;    // world span (±BOUNDS)
+    const W = this._span;
     // لایه ثابت مینی‌مپ
-    const S = 220, W = 200;
+    const S = 220;
     const c = document.createElement('canvas');
     c.width = S; c.height = S;
     const g = c.getContext('2d');
     g.fillStyle = '#5e9843';
     g.fillRect(0, 0, S, S);
-    const X = (x) => ((x + 100) / W) * S;
-    const Z = (z) => ((z + 100) / W) * S;
+    const X = (x) => ((x + W / 2) / W) * S;
+    const Z = (z) => ((z + W / 2) / W) * S;
     for (const r of mapData.rects) {
       g.fillStyle = r.c;
       g.fillRect(X(r.x1), Z(r.z1), X(r.x2) - X(r.x1), Z(r.z2) - Z(r.z1));
     }
+    this._drawPaths(g, S, X, Z, 1);
     this._mapStatic = c;
     // لایه ثابت نقشه بزرگ
-    const B = 560;
+    const B = 640;
     const bc = document.createElement('canvas');
     bc.width = B; bc.height = B;
     const bg = bc.getContext('2d');
     bg.fillStyle = '#5e9843';
     bg.fillRect(0, 0, B, B);
-    const BX = (x) => ((x + 100) / W) * B;
-    const BZ = (z) => ((z + 100) / W) * B;
+    const BX = (x) => ((x + W / 2) / W) * B;
+    const BZ = (z) => ((z + W / 2) / W) * B;
     // توری مختصات
     bg.strokeStyle = 'rgba(255,255,255,0.12)';
     bg.lineWidth = 1;
@@ -391,6 +432,7 @@ export class UI {
       bg.fillStyle = r.c;
       bg.fillRect(BX(r.x1), BZ(r.z1), BX(r.x2) - BX(r.x1), BZ(r.z2) - BZ(r.z1));
     }
+    this._drawPaths(bg, B, BX, BZ, 2.6);
     bg.font = 'bold 17px Vazirmatn, Tahoma, sans-serif';
     bg.textAlign = 'center';
     for (const l of mapData.labels) {
@@ -404,10 +446,33 @@ export class UI {
     this._bigStatic = bc;
   }
 
+  /** مسیرهای پیست و جاده‌ها روی نقشه */
+  _drawPaths(g, S, X, Z, w) {
+    const paths = (this._mapData && this._mapData.paths) || [];
+    for (const p of paths) {
+      if (!p.pts || p.pts.length < 2) continue;
+      g.beginPath();
+      g.moveTo(X(p.pts[0].x), Z(p.pts[0].z));
+      for (let i = 1; i < p.pts.length; i++) g.lineTo(X(p.pts[i].x), Z(p.pts[i].z));
+      if (p.closed) g.closePath();
+      g.strokeStyle = p.c || '#4a4a52';
+      g.lineWidth = (p.w || 2) * w;
+      g.lineJoin = 'round';
+      g.stroke();
+      if (p.dash) {
+        g.setLineDash([6 * w, 6 * w]);
+        g.strokeStyle = 'rgba(255,255,255,0.6)';
+        g.lineWidth = Math.max(1, 0.7 * w);
+        g.stroke();
+        g.setLineDash([]);
+      }
+    }
+  }
+
   _drawDynamics(g, S, dyn) {
-    const W = 200;
-    const X = (x) => ((x + 100) / W) * S;
-    const Z = (z) => ((z + 100) / W) * S;
+    const W = this._span || 256;
+    const X = (x) => ((x + W / 2) / W) * S;
+    const Z = (z) => ((z + W / 2) / W) * S;
     const sc = S / 220;
     const t = performance.now() / 1000;
     // اهداف مأموریت (پالس طلایی)
@@ -432,6 +497,14 @@ export class UI {
       g.fillStyle = v.active ? '#39d353' : v.locked ? '#8a8f98' : '#3b9eff';
       g.fillRect(X(v.x) - s / 2, Z(v.z) - s / 2, s, s);
       g.lineWidth = 1.5; g.strokeStyle = '#fff'; g.strokeRect(X(v.x) - s / 2, Z(v.z) - s / 2, s, s);
+    }
+    // حیوانات و پرنده‌ها
+    if (dyn.animals) {
+      for (const an of dyn.animals) {
+        g.beginPath(); g.arc(X(an.x), Z(an.z), 2.4 * sc, 0, 7);
+        g.fillStyle = an.kind === 'cat' ? '#ffb26b' : an.kind === 'dog' ? '#c99b6b' : an.kind === 'fish' ? '#8ee6ff' : '#ffe9a3';
+        g.fill();
+      }
     }
     // توپ
     if (dyn.ball) {
@@ -468,5 +541,250 @@ export class UI {
     g.clearRect(0, 0, cv.width, cv.height);
     g.drawImage(this._bigStatic, 0, 0);
     this._drawDynamics(g, cv.width, this.game.mapDynamics());
+  }
+
+  /* ============================================================
+     پنل‌های داینامیک گسترش: پیست، کارنامه، دفترچه داستان، دستاوردها
+     ============================================================ */
+  _panel(id, opts = {}) {
+    let el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement('div');
+      el.id = id;
+      el.className = 'sl-overlay hidden';
+      el.innerHTML = '<div class="sl-panel"><div class="sl-head"><h2></h2><div class="sl-head-sub"></div></div>' +
+        '<div class="sl-body"></div><div class="sl-foot"></div></div>';
+      document.body.appendChild(el);
+      el.addEventListener('mousedown', (e) => e.stopPropagation());
+    }
+    const q = (c) => el.querySelector(c);
+    if (opts.title != null) q('h2').textContent = opts.title;
+    if (opts.sub != null) q('.sl-head-sub').innerHTML = opts.sub;
+    if (opts.body != null) q('.sl-body').innerHTML = opts.body;
+    if (opts.foot != null) q('.sl-foot').innerHTML = opts.foot;
+    q('.sl-body').classList.toggle('wide', !!opts.wide);
+    return el;
+  }
+  openPanel(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    this._modals.add(id);
+    el.classList.remove('hidden');
+    if (this.game) this.game.onModalOpen(id);
+  }
+  closePanel(id) {
+    const el = document.getElementById(id);
+    if (!el || !this.isOpen(id)) return;
+    this._modals.delete(id);
+    el.classList.add('hidden');
+    if (this.game) { this.game.audio.play('close'); this.game.onModalClose(id); }
+  }
+  togglePanel(id) { if (this.isOpen(id)) this.closePanel(id); else this.openPanel(id); }
+
+  /* ---------------- پیست مسابقه ---------------- */
+  raceMenu(modes, onPick) {
+    const body = '<div class="race-modes">' + modes.map((m, i) =>
+      '<button class="race-mode" data-i="' + i + '">' +
+      '<div class="rm-icon">' + m.icon + '</div>' +
+      '<div class="rm-name">' + m.name + '</div>' +
+      '<div class="rm-desc">' + m.desc + '</div>' +
+      '<div class="rm-best">رکورد: ' + m.best + '</div></button>').join('') + '</div>';
+    const el = this._panel('race-menu', {
+      title: '🏁 پیست مسابقه آفتاب',
+      sub: 'یک حالت را انتخاب کن — با کات مسابقه رانندگی می‌کنی. کلیدهای: W/S گاز و ترمز، A/D فرمان، Space ترمز',
+      body,
+    });
+    el.querySelectorAll('.race-mode').forEach((b) => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const m = modes[Number(b.dataset.i)];
+        this.game.audio.play('click');
+        this.closePanel('race-menu');
+        onPick(m.id);
+      });
+    });
+    const foot = el.querySelector('.sl-foot');
+    foot.innerHTML = '<button class="btn" id="race-menu-close">بستن</button>';
+    foot.querySelector('#race-menu-close').addEventListener('click', (e) => { e.stopPropagation(); this.closePanel('race-menu'); });
+    this.openPanel('race-menu');
+  }
+
+  raceHUD(info) {
+    let el = document.getElementById('race-hud');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'race-hud';
+      el.className = 'hidden';
+      document.body.appendChild(el);
+    }
+    if (!info || !info.show) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    const best = info.best != null ? faNum(info.best.toFixed(2)) : '—';
+    el.innerHTML =
+      '<div class="rh-row"><span class="rh-mode">' + info.mode + '</span>' +
+      '<span class="rh-pos">جایگاه ' + faNum(info.pos) + ' از ' + faNum(info.rivals) + '</span></div>' +
+      '<div class="rh-row big"><span>دور ' + (info.laps ? faNum(info.lap) + '/' + faNum(info.laps) : 'آزاد') + '</span>' +
+      '<span class="rh-time">' + faNum(info.time.toFixed(2)) + '″</span></div>' +
+      '<div class="rh-row small"><span>بهترین دور: ' + best + '</span>' +
+      '<span>دروازهٔ ' + faNum((info.cp || 0) + 1) + '/' + faNum(info.cps || 0) + '</span>' +
+      '<span>کل: ' + faNum((info.total || 0).toFixed(1)) + '″</span></div>' +
+      (info.offTrack ? '<div class="rh-warn">از پیست بیرون رفتی!</div>' : '');
+  }
+
+  showCountdown(txt) {
+    let el = document.getElementById('countdown');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'countdown';
+      el.className = 'hidden';
+      document.body.appendChild(el);
+    }
+    if (txt == null) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    el.textContent = txt;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+  }
+
+  raceResults(data, onRetry, onClose) {
+    const rows = data.laps.map((t, i) => '<div class="sl-row"><span>دور ' + faNum(i + 1) + '</span><span>' + faNum(t.toFixed(2)) + '″</span></div>').join('');
+    const el = this._panel('race-results', {
+      title: (data.win ? '🏆 برنده شدی!' : '🏁 پایان مسابقه') + ' — ' + data.mode,
+      sub: 'جایگاه ' + faNum(data.pos) + ' از ' + faNum(data.total) + ' — زمان کل ' + faNum(data.time.toFixed(2)) + ' ثانیه',
+      body: '<div class="sl-cols"><div class="sl-card"><h3>دورها</h3>' + (rows || '<div class="sl-mut">تمرین آزاد</div>') + '</div>' +
+        '<div class="sl-card"><h3>جایزه</h3><div class="sl-row"><span>سکه</span><span>' + faNum(data.rewards.coins) + '</span></div>' +
+        '<div class="sl-row"><span>امتیاز</span><span>' + faNum(data.rewards.score) + '</span></div>' +
+        '<div class="sl-row"><span>بهترین دور</span><span>' + (data.best != null ? faNum(data.best.toFixed(2)) + '″' : '—') + '</span></div></div></div>',
+      foot: '<button class="btn primary" id="rr-again">مسابقهٔ دوباره</button><button class="btn" id="rr-close">خروج از پیست</button>',
+    });
+    el.querySelector('#rr-again').addEventListener('click', (e) => { e.stopPropagation(); this.closePanel('race-results'); onRetry(); });
+    el.querySelector('#rr-close').addEventListener('click', (e) => { e.stopPropagation(); this.closePanel('race-results'); onClose(); });
+    this.openPanel('race-results');
+  }
+
+  /* ---------------- دستاوردها ---------------- */
+  achievements(list, meta) {
+    const unlocked = list.filter((a) => a.done || a.unlocked).length;
+    const body = '<div class="ach-grid">' + list.map((a) => {
+      const on = !!(a.done || a.unlocked);
+      const pct = a.pct != null ? a.pct : Math.round((a.progress || 0) * 100);
+      const prog = a.haveText != null && a.goalText ? '<div class="ach-date">' + a.haveText + ' / ' + a.goalText + '</div>' : '';
+      return '<div class="ach-card ' + (on ? 'on' : '') + '">' +
+        '<div class="ach-icon">' + (on ? (a.icon || '⭐') : '🔒') + '</div>' +
+        '<div class="ach-txt"><div class="ach-name">' + a.name + '</div>' +
+        '<div class="ach-desc">' + (a.desc || '') + '</div>' +
+        (on ? '<div class="ach-date">باز شد! 🎉</div>' : prog + '<div class="ach-bar"><i style="width:' + pct + '%"></i></div>') +
+        '</div></div>';
+    }).join('') + '</div>';
+    const extra = meta && meta.distance != null
+      ? ' • مسافت پیموده‌شده: ' + faNum(meta.distance) + ' متر • زمان بازی: ' + faNum(Math.round((meta.playtime || 0) / 60)) + ' دقیقه'
+      : '';
+    const el = this._panel('achievements', {
+      title: '🏅 دستاوردها',
+      sub: faNum(unlocked) + ' از ' + faNum(list.length) + ' دستاورد باز شده' + extra,
+      body,
+      wide: true,
+      foot: '<button class="btn" id="ach-close">بستن (G)</button>',
+    });
+    el.querySelector('#ach-close').addEventListener('click', (e) => { e.stopPropagation(); this.closePanel('achievements'); });
+    this.openPanel('achievements');
+  }
+
+  /* ---------------- دفترچهٔ داستان ---------------- */
+  journal(data) {
+    const chap = data.chapters.map((ch) => {
+      const rows = ch.quests.map((q) => {
+        const cls = q.state === 'done' ? 'qdone' : q.state === 'active' ? 'qactive' : 'qavail';
+        return '<div class="j-quest ' + cls + '">' +
+          '<div class="jq-title">' + (q.state === 'done' ? '✅' : q.state === 'active' ? '▶️' : '🔹') + ' ' + q.title + '</div>' +
+          '<div class="jq-desc">' + q.desc + '</div>' +
+          (q.objective ? '<div class="jq-obj">هدف: ' + q.objective + '</div>' : '') +
+          '<div class="jq-meta">' + q.stateText + ' • جایزه: ' + faNum(q.coins) + ' سکه</div></div>';
+      }).join('');
+      return '<div class="j-chapter ' + (ch.unlocked ? '' : 'locked') + '"><h3>' + ch.icon + ' ' + ch.title + '</h3>' + rows + '</div>';
+    }).join('');
+    const side = data.side.map((q) =>
+      '<div class="j-quest ' + (q.state === 'done' ? 'qdone' : q.state === 'active' ? 'qactive' : 'qavail') + '">' +
+      '<div class="jq-title">⭐ ' + q.title + '</div><div class="jq-desc">' + q.desc + '</div>' +
+      (q.objective ? '<div class="jq-obj">هدف: ' + q.objective + '</div>' : '') + '</div>').join('');
+    const el = this._panel('journal', {
+      title: '📖 دفترچهٔ داستان',
+      sub: 'پیشرفت: ' + faNum(data.progress.done) + ' از ' + faNum(data.progress.total) + ' مأموریت (' + faNum(data.progress.pct) + '٪)',
+      body: '<div class="j-wrap">' + chap + '<div class="j-chapter"><h3>⭐ مأموریت‌های جانبی</h3>' + side + '</div></div>',
+      wide: true,
+      foot: '<button class="btn" id="j-close">بستن (J)</button>',
+    });
+    el.querySelector('#j-close').addEventListener('click', (e) => { e.stopPropagation(); this.closePanel('journal'); });
+    this.openPanel('journal');
+  }
+
+  /* ---------------- کارنامه و امتحان ---------------- */
+  grades(report, onExam) {
+    const rows = report.subjects.map((sj) =>
+      '<div class="gr-row"><span class="gr-name">' + sj.icon + ' ' + sj.name + '</span>' +
+      '<span class="gr-know"><i style="width:' + sj.knowledge + '%"></i><b>' + faNum(sj.knowledge) + '٪</b></span>' +
+      '<span class="gr-grade ' + (sj.grade == null ? '' : sj.grade >= 14 ? 'good' : sj.grade >= 10 ? 'ok' : 'bad') + '">' + sj.gradeText + '</span>' +
+      '<button class="btn small gr-btn" data-id="' + sj.id + '"' + (report.ready(sj.id) ? '' : ' disabled') + '>امتحان</button></div>').join('');
+    const el = this._panel('grades', {
+      title: '🎒 کارنامهٔ من',
+      sub: 'معدل: <b>' + report.gpaText + '</b> • دانش کلی: ' + faNum(report.progress) + '٪ • امتحان‌ها: ' + faNum(report.examsTotal) +
+        ' • جلسه‌های مطالعه: ' + faNum(report.study),
+      body: '<div class="gr-list">' + rows + '</div>' +
+        '<p class="sl-mut">برای امتحان هر درس باید دانش آن درس حداقل ۱۲٪ باشد: در کلاس آن درس حاضر شو (زنگ‌های ۸–۱۰ و ۱۱–۱۳)، در کتابخانه مطالعه کن یا از میز مطالعه استفاده کن.</p>',
+      foot: '<button class="btn" id="gr-close">بستن (K)</button>',
+    });
+    el.querySelectorAll('.gr-btn').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (b.disabled) return;
+      this.closePanel('grades');
+      onExam(b.dataset.id);
+    }));
+    el.querySelector('#gr-close').addEventListener('click', (e) => { e.stopPropagation(); this.closePanel('grades'); });
+    this.openPanel('grades');
+  }
+
+  examStart(data, onAnswer) {
+    this._examAnswer = onAnswer;
+    const body = '<div class="ex-head">' + data.icon + ' امتحان ' + data.subject + ' — سؤال ' + faNum(data.index) + ' از ' + faNum(data.total) + '</div>' +
+      '<div class="ex-q">' + data.question + '</div>' +
+      '<div class="ex-opts">' + data.options.map((o, i) =>
+        '<button class="ex-opt" data-i="' + i + '"><span class="dlg-num">' + faNum(i + 1) + '</span> ' + o + '</button>').join('') + '</div>' +
+      '<div class="ex-time"><i id="ex-time-bar"' + '></i></div>';
+    const el = this._panel('exam', {
+      title: '📝 امتحان',
+      sub: 'زمان هر سؤال ۳۰ ثانیه است — با کلیدهای ۱ تا ۴ هم می‌توانی پاسخ دهی',
+      body,
+    });
+    el.querySelectorAll('.ex-opt').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this._examLock) return;
+      this._examLock = true;
+      setTimeout(() => { this._examLock = false; }, 180);
+      this.game.audio.play('click');
+      onAnswer(Number(b.dataset.i));
+    }));
+    this.examUpdate(data.time);
+    this.openPanel('exam');
+  }
+  examUpdate(time) {
+    const bar = document.getElementById('ex-time-bar');
+    if (bar) bar.style.width = clamp((time / 30) * 100, 0, 100) + '%';
+  }
+  examResult(data) {
+    this.closePanel('exam');
+    const body = '<div class="ex-res">' + data.icon + '</div>' +
+      '<div class="ex-score">' + faNum(data.grade.toFixed(2)) + '<span>از ۲۰</span></div>' +
+      '<div class="sl-row"><span>پاسخ درست</span><span>' + faNum(data.correct) + ' از ' + faNum(data.total) + '</span></div>' +
+      '<div class="sl-row"><span>دانش ' + data.subject + '</span><span>' + faNum(data.knowledge) + '٪</span></div>' +
+      '<div class="sl-row"><span>معدل کل</span><span>' + faNum(data.gpa.toFixed(2)) + '</span></div>' +
+      (data.passed ? '<p class="ex-pass">قبول شدی! 🎉</p>' : '<p class="ex-fail">این بار نشد — بیشتر مطالعه کن و دوباره بیا.</p>');
+    const el = this._panel('exam-result', {
+      title: data.passed ? '✅ امتحان ' + data.subject : '📋 نتیجهٔ امتحان ' + data.subject,
+      body,
+      foot: '<button class="btn primary" id="exr-close">ادامه</button>',
+    });
+    el.querySelector('#exr-close').addEventListener('click', (e) => { e.stopPropagation(); this.closePanel('exam-result'); });
+    this.openPanel('exam-result');
   }
 }

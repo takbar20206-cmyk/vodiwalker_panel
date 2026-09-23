@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { rand, choice, clamp, lerpAngle, resolveCollisions, dist2D, inRect } from './utils.js';
 import { textSprite } from './gfx.js';
-import { areaOf, AREAS, DOORS } from './world.js';
+import { areaOf, AREAS, DOORS, BOUNDS } from './world.js';
 
 const SHIRTS = [0x3b82f6, 0xef4444, 0x22c55e, 0xf59e0b, 0x8b5cf6, 0xec4899, 0x14b8a6, 0xeab308, 0x6366f1];
 const PANTS = [0x2f3a4a, 0x4a3b2f, 0x334155, 0x1f2937, 0x5b5b5b];
@@ -208,6 +208,101 @@ export class NPCManager {
       });
     }
     this.roamZones = roamZones;
+    this.buildExtended();
+  }
+
+  /* ---------- اهالی محله‌های جدید: شهر، خوابگاه، استخر، پیست ---------- */
+  buildExtended() {
+    const Z = this.roamZones;
+    Z.city     = { x1: -62, z1: 76, x2: 62, z2: 88 };
+    Z.cityWest = { x1: -104, z1: 80, x2: -78, z2: 88 };
+    Z.parkCity = { x1: -100, z1: 62, x2: -88, z2: 76 };
+    Z.skate    = { x1: 82,  z1: 62, x2: 106, z2: 86 };
+    Z.dormYard = { x1: -100, z1: 32, x2: -80, z2: 46 };
+    Z.poolYard = { x1: 76,  z1: -4,  x2: 100, z2: 6 };
+    Z.pitYard  = { x1: -4,  z1: -68, x2: 20,  z2: -58 };
+
+    // --- فروشنده‌های شهر (پشت پیشخوان هر مغازه) ---
+    const sellers = [
+      { id: 'javadi', name: 'آقای جوادی',  x: -70, shirt: 0x3b82f6, kind: 'super' },
+      { id: 'parisa', name: 'خانم پریسا',  x: -46, shirt: 0xef4444, kind: 'pizza', longHair: true },
+      { id: 'kamran', name: 'کامران',      x: -22, shirt: 0x22c55e, kind: 'ice' },
+      { id: 'leila',  name: 'خانم لیلا',   x: 2,   shirt: 0x8b5cf6, kind: 'book', longHair: true },
+      { id: 'saeed',  name: 'آقای سعید',   x: 26,  shirt: 0xf59e0b, kind: 'toy' },
+      { id: 'shirin', name: 'خانم شیرین',  x: 50,  shirt: 0x14b8a6, kind: 'clinic', longHair: true },
+      { id: 'babak',  name: 'بابک',        x: -88, shirt: 0x6b4a2a, kind: 'cafe' },
+    ];
+    for (const s of sellers) {
+      this.add({
+        id: s.id, name: s.name, title: 'فروشنده', role: 'staff', static: true,
+        post: { x: s.x, z: 100.4 },
+        lines: ['به مغازهٔ ما خوش آمدی!', 'امروز تخفیف داریم!'],
+        look: { shirt: s.shirt, longHair: !!s.longHair },
+      });
+    }
+
+    // --- اهالی خوابگاه و سالن غذاخوری ---
+    this.add({ id: 'naderi', name: 'آقای نادری', title: 'مسئول خوابگاه', role: 'staff', static: true,
+      post: { x: -80, z: 14.6 }, lines: ['خوابگاه آفتاب اینجاست.', 'اتاق خالی برایت داریم!'],
+      look: { shirt: 0x334155, height: 1.78 } });
+    this.add({ id: 'rahimi', name: 'آقای رحیمی', title: 'آشپز', role: 'staff', static: true,
+      post: { x: -97, z: -25.4 }, lines: ['غذای امروز: کوکو سبزی!', 'دست‌پخت خودم است 🍲'],
+      look: { shirt: 0xf2c94c, height: 1.76 } });
+
+    // --- استخر، آزمایشگاه، پیست اسکیت و پیست مسابقه ---
+    this.add({ id: 'bahrami', name: 'مربی بهرامی', title: 'مربی شنا', role: 'teacher', static: true,
+      post: { x: 102.5, z: -20 }, lines: ['قبل از شنا گرم کن!', 'حلقه‌ها را از آب بگیر!'],
+      look: { shirt: 0x0ea5e9, height: 1.8 } });
+    this.add({ id: 'mousavi', name: 'خانم موسوی', title: 'معلم علوم', role: 'teacher', static: true,
+      post: { x: 50.5, z: -5 }, lines: ['به آزمایشگاه خوش آمدی!', 'میکروسکوپ آماده است 🔬'],
+      look: { shirt: 0xffffff, longHair: true, height: 1.72 } });
+    this.add({ id: 'arash', name: 'آرش', title: 'اسکیت‌باز', role: 'student', static: true,
+      post: { x: 95, z: 70 }, lines: ['پارک اسکیت شهر عالیه!', 'از رمپ‌ها بپر و ترفند بزن 🛹'],
+      look: { shirt: 0xe0563f } });
+    this.add({ id: 'kaveh', name: 'کاوه', title: 'مسئول پیست', role: 'staff', static: true,
+      post: { x: 12, z: -66 }, lines: ['پیست آفتاب باز است!', 'کلید R برای مسابقه 🏁'],
+      look: { shirt: 0x2f3a4a, height: 1.8 } });
+
+    // --- مدرسه: معاون، معلم هنر، نگهبان، تعمیرکار دوچرخه ---
+    this.add({ id: 'nazanin', name: 'خانم نازنین', title: 'معاون', role: 'teacher', static: true,
+      post: { x: 0, z: 12 }, lines: ['جشن پایان سال نزدیک است!', 'بادکنک و کیک لازم داریم 🎈'],
+      look: { shirt: 0xec4899, longHair: true, height: 1.72 } });
+    this.add({ id: 'nikpour', name: 'خانم نیک‌پور', title: 'معلم هنر', role: 'teacher', static: true,
+      post: { x: 2.6, z: -26.2 }, lines: ['رنگ‌ها را قاطی کن!', 'نقاشی‌ات را روی دیوار بزن 🎨'],
+      look: { shirt: 0x8b5cf6, longHair: true, height: 1.7 } });
+    this.add({ id: 'naser', name: 'نگهبان ناصر', title: 'نگهبان', role: 'staff', static: true,
+      post: { x: 6, z: 53 }, lines: ['مواظب دروازه‌ام.', 'شب‌ها دروازه بسته است 🌙'],
+      look: { shirt: 0x1f2937, height: 1.82 } });
+    this.add({ id: 'farid', name: 'آقای فرید', title: 'تعمیرکار دوچرخه', role: 'staff', static: true,
+      post: { x: 94, z: 74 }, lines: ['دوچرخه‌ات را برایت آماده کردم!', 'کلید B برای رکاب زدن 🚲'],
+      look: { shirt: 0x9aa3ad, height: 1.78 } });
+
+    // --- عابرهای شهر ---
+    const peds = [
+      { id: 'ped1', name: 'میلاد', zone: 'city', shirt: 0x6366f1 },
+      { id: 'ped2', name: 'شادی', zone: 'city', shirt: 0xff8fb1, longHair: true },
+      { id: 'ped3', name: 'بهنام', zone: 'cityWest', shirt: 0x4aa96c },
+      { id: 'ped4', name: 'رؤیا', zone: 'city', shirt: 0xeab308, longHair: true, lowHide: true },
+      { id: 'ped5', name: 'سینا', zone: 'parkCity', shirt: 0x0ea5e9 },
+      { id: 'ped6', name: 'لیلا', zone: 'parkCity', shirt: 0xef4444, longHair: true, lowHide: true },
+      { id: 'ped7', name: 'امید', zone: 'skate', shirt: 0xe0563f },
+      { id: 'ped8', name: 'غزل', zone: 'skate', shirt: 0x8b5cf6, longHair: true, lowHide: true },
+      { id: 'ped9', name: 'حسام', zone: 'dormYard', shirt: 0x14b8a6 },
+      { id: 'ped10', name: 'نیلوفر', zone: 'dormYard', shirt: 0xf59e0b, longHair: true, lowHide: true },
+      { id: 'ped11', name: 'آرمین', zone: 'poolYard', shirt: 0x3b82f6 },
+      { id: 'ped12', name: 'سارینا', zone: 'poolYard', shirt: 0x22c55e, longHair: true, lowHide: true },
+      { id: 'ped13', name: 'فرزاد', zone: 'pitYard', shirt: 0x8b5cf6 },
+    ];
+    const lines = ['شهر آفتاب جای قشنگیه!', 'بعد از مدرسه کجا بریم؟', 'استخر امشب شلوغه!', 'پیست ماشین‌سواری داری؟', 'بستنی اینجا خیلی خوشمزه‌ست!'];
+    for (const pd of peds) {
+      const z = this.roamZones[pd.zone];
+      this.add({
+        id: pd.id, name: pd.name, title: 'شهروند', role: 'student',
+        post: { x: rand(z.x1, z.x2), z: rand(z.z1, z.z2) },
+        zone: pd.zone, zonePool: [pd.zone], nightHide: true, lowHide: !!pd.lowHide,
+        lines, look: { shirt: pd.shirt, longHair: !!pd.longHair },
+      });
+    }
   }
 
   npcById(id) { return this.npcs.find((n) => n.id === id); }
@@ -273,8 +368,9 @@ export class NPCManager {
           const p = { x: gp.x + dx * step, z: gp.z + dz * step };
           resolveCollisions(p, 0.35, colliders);
           const moved = dist2D(gp.x, gp.z, p.x, p.z);
-          gp.x = clamp(p.x, -94, 94);
-          gp.z = clamp(p.z, -94, 94);
+          const lim = BOUNDS - 6;
+          gp.x = clamp(p.x, -lim, lim);
+          gp.z = clamp(p.z, -lim, lim);
           n.faceYaw = Math.atan2(dx, dz);
           n.moving = moved > step * 0.25;
           // تشخیص گیر کردن
@@ -380,7 +476,7 @@ export class NPCManager {
         n.patrolI = 0;
       } else if (n.zone) {
         // تعویض محوطه گشت در فاز جدید
-        const keys = Object.keys(this.roamZones);
+        const keys = n.zonePool || Object.keys(this.roamZones);
         const zi = (keys.indexOf(n.zone) + 1) % keys.length;
         n.zone = keys[zi];
         const z = this.roamZones[n.zone];

@@ -63,6 +63,53 @@ export class Player {
     this._stepT = 0;
     this.onStep = null;   // صدای قدم
     this.onJump = null;
+    this.ride = null;     // 'bike' | 'skate'
+    this.rideMesh = null;
+    this._buildRides();
+  }
+
+  /* ---------- دوچرخه و تخته‌اسکیت ---------- */
+  _buildRides() {
+    const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
+    const mk = (kind) => {
+      const g = new THREE.Group();
+      if (kind === 'bike') {
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 1.05), mat(0x2f6fed));
+        frame.position.set(0, 0.62, 0.05); g.add(frame);
+        const seat = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.1, 0.36), mat(0x1f2937));
+        seat.position.set(0, 0.78, -0.42); g.add(seat);
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.07, 0.07), mat(0x4a4a52));
+        bar.position.set(0, 0.96, 0.5); g.add(bar);
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.42, 0.08), mat(0x9aa3ad));
+        post.position.set(0, 0.78, 0.5); g.add(post);
+        for (const wz of [0.58, -0.58]) {
+          const w = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.06, 6, 14), mat(0x1f2937));
+          w.position.set(0, 0.34, wz);
+          w.rotation.y = Math.PI / 2;
+          w.castShadow = true;
+          g.add(w);
+        }
+      } else {
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 1.1), mat(0xe67e22));
+        deck.position.set(0, 0.16, 0); deck.castShadow = true; g.add(deck);
+        for (const [wx, wz] of [[-0.12, 0.36], [0.12, 0.36], [-0.12, -0.36], [0.12, -0.36]]) {
+          const w = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.06, 8), mat(0xf2c94c));
+          w.rotation.z = Math.PI / 2;
+          w.position.set(wx, 0.08, wz); g.add(w);
+        }
+      }
+      g.visible = false;
+      return g;
+    };
+    this.rideMesh = { bike: mk('bike'), skate: mk('skate') };
+    for (const k in this.rideMesh) this.group.add(this.rideMesh[k]);
+  }
+
+  setRide(kind) {
+    if (kind && !this.rideMesh[kind]) kind = null;
+    this.ride = kind;
+    for (const k in this.rideMesh) this.rideMesh[k].visible = (k === kind);
+    return this.ride;
   }
 
   spawn(x, z, yaw) {
@@ -99,7 +146,8 @@ export class Player {
         moving = true;
       }
       sprinting = moving && input.sprint;
-      const speed = sprinting ? RUN : WALK;
+      const mult = this.ride === 'bike' ? 2.05 : this.ride === 'skate' ? 1.5 : 1;
+      const speed = (sprinting ? RUN : WALK) * mult;
       this.speedSm += ((moving ? speed : 0) - this.speedSm) * Math.min(1, dt * 10);
 
       if (moving) {
@@ -118,7 +166,7 @@ export class Player {
       }
       // پرش و گرانش
       if (input.jump && this.grounded) {
-        this.vy = JUMP_V;
+        this.vy = JUMP_V * (this.ride === 'skate' ? 1.25 : this.ride === 'bike' ? 0.85 : 1);
         this.grounded = false;
         if (this.onJump) this.onJump();
       }
@@ -130,7 +178,15 @@ export class Player {
       // انیمیشن
       this.group.rotation.y = lerpAngle(this.group.rotation.y, this.faceYaw, dt * 12);
       const P = this.group.userData.parts;
-      if (moving && this.grounded) {
+      if (this.ride) {
+        // پاها روی رکاب/تخته، دست‌ها روی فرمان
+        const t = this.walkPhase;
+        P.legL.rotation.x = 0.25 + Math.sin(t) * 0.15;
+        P.legR.rotation.x = 0.25 - Math.sin(t) * 0.15;
+        P.armL.rotation.x = -0.75; P.armR.rotation.x = -0.75;
+        P.body.position.y = 1.02 + (this.ride === 'bike' ? 0.05 : 0.02);
+        if (moving && this.grounded) this.walkPhase += dt * (4 + this.speedSm * 0.9);
+      } else if (moving && this.grounded) {
         this.walkPhase += dt * (4 + this.speedSm * 1.35);
         const sw = Math.sin(this.walkPhase) * clamp(this.speedSm / WALK, 0.4, 1.3) * 0.6;
         P.legL.rotation.x = sw; P.legR.rotation.x = -sw;

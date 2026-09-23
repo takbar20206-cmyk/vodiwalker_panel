@@ -37,7 +37,7 @@ export const PARKING_SPOTS = {
   scooter: { x: -46, z: 44, heading: 0 },
   teacher: { x: -42, z: 44, heading: 0 },
 };
-export const BOUNDS = 95;
+export const BOUNDS = 128;
 
 export function areaOf(x, z) {
   if (inRect(x, z, AREAS.roomA)) return 'roomA';
@@ -58,6 +58,7 @@ export class World {
     this.clouds = [];
     this.mapRects = [];
     this.mapLabels = [];
+    this.mapPaths = [];
     this.time = 0;
     this.night01 = 0;
     this.day01 = 1;
@@ -122,7 +123,7 @@ export class World {
         ctx.beginPath(); ctx.moveTo(0, i * s); ctx.lineTo(w, i * s); ctx.stroke();
       }
     };
-    this.texGrass = canvasTexture(256, 256, speckle('#6fae4e', ['#5d9840', '#7fc25c', '#679e48']), { repeat: [48, 48] });
+    this.texGrass = canvasTexture(256, 256, speckle('#6fae4e', ['#5d9840', '#7fc25c', '#679e48']), { repeat: [74, 74] });
     this.texPave = canvasTexture(256, 256, tiles('#b3aa9c', '#9a9184', 4), { repeat: [13, 11] });
     this.texAsphalt = canvasTexture(256, 256, speckle('#40444c', ['#353941', '#4c515a']), { repeat: [20, 2] });
     this.texPark = canvasTexture(256, 256, speckle('#454a52', ['#3a3e45', '#51565f']), { repeat: [6, 4] });
@@ -310,7 +311,7 @@ export class World {
 
   /* ---------------- مرحله ۱: زمین و خیابان ---------------- */
   _buildGround() {
-    const g = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), this.M.grass);
+    const g = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), this.M.grass);
     g.rotation.x = -Math.PI / 2;
     g.receiveShadow = true;
     this.scene.add(g);
@@ -741,6 +742,15 @@ export class World {
       { x1: -80, z1: -64, x2: -68, z2: 72 },     // خیابان غرب
       { x1: -77, z1: -60, x2: 77, z2: -48 },     // خیابان شمال
       { x1: -63, z1: -45, x2: -45, z2: -35 },    // داخل باغ مخفی
+      { x1: -110, z1: -118, x2: 110, z2: -56 },  // پیست مسابقه
+      { x1: -110, z1: 58, x2: 116, z2: 106 },    // شهر و پارک شهر
+      { x1: 70, z1: -38, x2: 108, z2: -2 },      // استخر
+      { x1: 30, z1: -22, x2: 58, z2: 2 },        // آزمایشگاه
+      { x1: 76, z1: 56, x2: 114, z2: 94 },       // پارک اسکیت
+      { x1: -108, z1: -34, x2: -74, z2: 34 },    // خوابگاه و غذاخوری
+      { x1: -6, z1: 57, x2: 6, z2: 82 },         // مسیر ورودی شهر
+      { x1: -74, z1: -36, x2: -62, z2: 26 },     // مسیر خوابگاه
+      { x1: 62, z1: -36, x2: 76, z2: 0 },        // مسیر استخر
     ];
     const isBlocked = (x, z, m = 1.5) => blocked.some((r) => x > r.x1 - m && x < r.x2 + m && z > r.z1 - m && z < r.z2 + m);
 
@@ -766,7 +776,7 @@ export class World {
     // پراکنده بیرون محوطه
     let tries = 0;
     while (spots.length < 110 && tries++ < 600) {
-      const x = rand(-92, 92), z = rand(-90, 90);
+      const x = rand(-124, 124), z = rand(-124, 124);
       if (Math.abs(x) < 68 && z > -48 && z < 58) continue; // داخل محوطه نه
       if (isBlocked(x, z, 4)) continue;
       let nearHouse = false;
@@ -846,7 +856,8 @@ export class World {
   /* ---------------- مرحله ۸: بیرون مدرسه ---------------- */
   _buildOutside() {
     this._houseSpots = [
-      [-50, 78], [0, 80], [50, 78], [-86, -20], [-86, 28], [80, -12], [80, 32], [-30, -70], [32, -70],
+      [-118, 10], [-118, 52], [-118, 96], [118, -10], [118, 40], [118, 96],
+      [-70, 116], [0, 118], [70, 116],
     ];
     this._houseSpots.forEach(([x, z], i) => {
       const w = rand(9, 13), d = rand(7, 10), h = rand(3.5, 6);
@@ -861,13 +872,13 @@ export class World {
       this.box(1.4, 2.2, 0.2, this.M.door, x, 1.1, z + d / 2 + 0.05);
       this.mapRects.push({ x1: x - w / 2, z1: z - d / 2, x2: x + w / 2, z2: z + d / 2, c: '#9a938a' });
     });
-    this.mapLabels.push({ x: 0, z: 80, t: 'محله' });
+    this.mapLabels.push({ x: -24, z: 112, t: 'شهر آفتاب' });
 
     // تپه‌های دوردست (افق)
     for (let i = 0; i < 10; i++) {
       const a = (i / 10) * Math.PI * 2;
-      const r = 130 + rand(0, 25);
-      const hill = new THREE.Mesh(new THREE.SphereGeometry(rand(22, 38), 10, 7), this.M.hill);
+      const r = 178 + rand(0, 30);
+      const hill = new THREE.Mesh(new THREE.SphereGeometry(rand(30, 48), 10, 7), this.M.hill);
       hill.position.set(Math.cos(a) * r, -6, Math.sin(a) * r);
       hill.scale.y = 0.35;
       this.scene.add(hill);
@@ -1179,7 +1190,7 @@ export class World {
 
   /* ---------------- داده نقشه ---------------- */
   getMapData() {
-    return { rects: this.mapRects, labels: this.mapLabels };
+    return { rects: this.mapRects, labels: this.mapLabels, paths: this.mapPaths || [], bounds: BOUNDS };
   }
 
   /** بازگردانی آیتم‌ها برای ذخیره */

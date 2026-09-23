@@ -23,6 +23,38 @@ export class MissionManager {
     for (const id of Object.keys(REWARDS)) this.st[id] = { st: 'available', prog: 0 };
     this.secretFound = false;
     this.timedLeft = 0;
+    this.dyn = {};          // مأموریت‌های داستانی ثبت‌شده از story.js
+  }
+
+  /* ============================================================
+     مأموریت‌های پویا (زنجیرهٔ داستانی) — ثبت از StoryManager
+     ============================================================ */
+  registerDynamic(q) {
+    this.dyn[q.id] = q;
+    if (!this.st[q.id]) this.st[q.id] = { st: 'available', prog: 0 };
+    return q;
+  }
+
+  dynamicList() {
+    const out = [];
+    for (const id in this.dyn) {
+      const q = this.dyn[id];
+      const st = this.st[id] ? this.st[id].st : 'available';
+      out.push({ ...q, state: st });
+    }
+    return out;
+  }
+
+  completeDynamic(id) {
+    if (!this.st[id]) return;
+    this.st[id].st = 'done';
+    if (this.ctx.game.achievements) this.ctx.game.achievements.bump('missions', 1);
+    const q = this.dyn[id];
+    if (q) {
+      this.game.addCoins(q.coins || 0);
+      this.game.addScore(q.score || 0);
+      this.ui.toast('جایزه: ' + faNum(q.coins || 0) + ' سکه و ' + faNum(q.score || 0) + ' امتیاز');
+    }
   }
 
   get game() { return this.ctx.game; }
@@ -95,6 +127,7 @@ export class MissionManager {
     const p = this.ctx.player;
     if (this.world.sparkles) this.world.sparkles.spawn(p.x, 1.5, p.z, 0xffd34d, 45, { spread: 3, up: 5, life: 1.3 });
     this.ui.banner('مأموریت کامل شد!', r.title + ' — جایزه: ' + faNum(r.coins) + ' سکه و ' + faNum(r.score) + ' امتیاز');
+    if (this.ctx.game.achievements) this.ctx.game.achievements.bump('missions', 1);
     this.refreshMarkers();
     this.game.autosave();
     if (this.completionPct() >= 100) {
@@ -129,6 +162,20 @@ export class MissionManager {
     this.npcs.setMarker('kian', S('help_student') === 'available' ? '!' : (S('help_student') === 'active' && hasSand ? 'star' : null));
     // دنیا
     this.npcs.setMarker('donya', S('collect_cans') === 'available' ? '!' : (S('collect_cans') === 'active' && P('collect_cans') >= 8 ? 'star' : null));
+
+    // مارکرهای مأموریت‌های داستانی
+    for (const id in this.dyn) {
+      const q = this.dyn[id];
+      if (!q.marker) continue;
+      let m = null;
+      try { m = q.marker(); } catch (e) { m = null; }
+      if (!m || !m[0]) continue;
+      // اگر مأموریت اصلی روی همان NPC مارکر دارد، فقط وقتی فعال نیست بازنویسی کن
+      const already = ['sara', 'farhadi', 'ahmadi', 'rostami'].includes(m[0]) &&
+        (this.st.lost_bag.st === 'available' || this.st.library_books.st === 'available' || this.st.riddle.st === 'available' || this.st.football.st === 'available');
+      if (already && m[1] === '!') continue;
+      this.npcs.setMarker(m[0], m[1]);
+    }
   }
 
   /* ---------------- ۱. کوله‌پشتی گمشده ---------------- */
@@ -429,7 +476,7 @@ export class MissionManager {
 
   /* ---------------- Quest Tracker ---------------- */
   tracker() {
-    const out = [];
+    const out = this._dynamicTracker();
     const T = MISSION_TITLES;
     const g = this.game;
     if (this.st.lost_bag.st === 'active') {
@@ -465,7 +512,7 @@ export class MissionManager {
 
   /** اهداف طلایی روی نقشه */
   targets() {
-    const t = [];
+    const t = this._dynamicTargets();
     const npcPos = (id) => {
       const n = this.npcs.npcById(id);
       return n ? { x: n.group.position.x, z: n.group.position.z } : null;
@@ -504,10 +551,38 @@ export class MissionManager {
     return t.filter(Boolean);
   }
 
+  /** مأموریت‌های داستانی فعال برای نوار کنار صفحه */
+  _dynamicTracker() {
+    const out = [];
+    for (const id in this.dyn) {
+      const q = this.dyn[id];
+      const st = this.st[id] ? this.st[id].st : 'available';
+      if (st !== 'active') continue;
+      let obj = '';
+      try { obj = typeof q.objective === 'function' ? q.objective() : (q.objective || ''); } catch (e) { obj = ''; }
+      out.push({ id, title: q.title, obj: obj || 'در حال انجام…', chapter: q.chapter || '', side: !!q.side });
+    }
+    return out;
+  }
+
   completionPct() {
     const ids = Object.keys(this.st);
     const done = ids.filter((id) => this.st[id].st === 'done').length;
     return Math.round((done / ids.length) * 100);
+  }
+
+  /** اهداف مینی‌مپ برای مأموریت‌های داستانی فعال */
+  _dynamicTargets() {
+    const t = [];
+    for (const id in this.dyn) {
+      const q = this.dyn[id];
+      const st = this.st[id] ? this.st[id].st : 'available';
+      if (st !== 'active' || !q.target) continue;
+      let p = null;
+      try { p = q.target(); } catch (e) { p = null; }
+      if (p && p.x != null) t.push({ x: p.x, z: p.z, id });
+    }
+    return t;
   }
 
   stateForSave() {

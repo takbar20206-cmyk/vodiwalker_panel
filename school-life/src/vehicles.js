@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { clamp, resolveCollisions, pointBlocked, dist2D } from './utils.js';
 import { BOUNDS, PARKING_SPOTS } from './world.js';
+import { textSprite } from './gfx.js';
 
 function wheelMesh(r, w, mat) {
   const geo = new THREE.CylinderGeometry(r, r, w, 12);
@@ -99,6 +100,45 @@ function buildCar(color) {
   return { group: g, wheels, steers };
 }
 
+/* ---------- کات مسابقه (Low-Poly) ---------- */
+export function buildKart(color, num) {
+  const g = new THREE.Group();
+  const M = (c) => new THREE.MeshLambertMaterial({ color: c });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.34, 2.05), M(color));
+  body.position.y = 0.44; body.castShadow = true; g.add(body);
+  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.2, 0.62), M(0xf2f2ea));
+  nose.position.set(0, 0.4, 1.24); g.add(nose);
+  const engine = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.5), M(0x33383f));
+  engine.position.set(0, 0.66, -0.95); g.add(engine);
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.5, 0.52), M(0x2c313a));
+  seat.position.set(0, 0.7, -0.32); g.add(seat);
+  const wheelBar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.07, 0.07), M(0x22242a));
+  wheelBar.position.set(0, 0.86, 0.42); g.add(wheelBar);
+  const spoiler = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 0.32), M(0x22242a));
+  spoiler.position.set(0, 0.88, -1.02); g.add(spoiler);
+  for (const sx of [-0.38, 0.38]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.26, 0.07), M(0x22242a));
+    post.position.set(sx, 0.72, -1.02); g.add(post);
+  }
+  const wheels = [], steers = [];
+  for (const [px, pz, st] of [[-0.64, 0.72, true], [0.64, 0.72, true], [-0.7, -0.68, false], [0.7, -0.68, false]]) {
+    const pivot = new THREE.Group();
+    pivot.position.set(px, 0.26, pz);
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.22, 10), M(0x1d1f24));
+    w.rotation.z = Math.PI / 2;
+    w.castShadow = true;
+    pivot.add(w);
+    g.add(pivot);
+    wheels.push({ mesh: w, r: 0.27 });
+    if (st) steers.push(pivot);
+  }
+  const label = textSprite(String(num), { height: 0.55, bg: 'rgba(20,24,32,0.7)', fg: '#ffe9a3', size: 40 });
+  label.position.set(0, 1.45, 0);
+  g.add(label);
+  g.userData.wheels = wheels;
+  return { group: g, wheels, steers };
+}
+
 export class VehicleManager {
   constructor(scene, world, audio) {
     this.scene = scene;
@@ -114,6 +154,7 @@ export class VehicleManager {
   _addVehicle(id, name, desc, built, x, z, heading, opts = {}) {
     const v = {
       id, name, desc,
+      type: opts.type || 'car',
       group: built.group, wheels: built.wheels, steers: built.steers,
       x, z, heading, speed: 0,
       maxSpeed: opts.maxSpeed || 13,
@@ -142,6 +183,30 @@ export class VehicleManager {
   }
 
   byId(id) { return this.list.find((v) => v.id === id); }
+
+  /** ساخت کات بازیکن روی خط شروع پیست (برای مسابقه) */
+  ensureKarts() {
+    if (this.byId('kart1')) return this.byId('kart1');
+    const t = this.world.ext && this.world.ext.track;
+    let x = 12, z = -66, heading = 0;
+    if (t && t.pts && t.pts.length) {
+      const i = t.startIdx || 0, N = t.pts.length;
+      const p = t.pts[i], nx = t.pts[(i + 1) % N];
+      x = p.x; z = p.z;
+      heading = Math.atan2(nx.x - p.x, nx.z - p.z);
+      const n = t.normals ? t.normals[i] : { x: 0, z: 0 };
+      x += n.x * 2.2; z += n.z * 2.2;
+    }
+    const kart = this._addVehicle('kart1', 'کات آفتاب', 'کات مسابقه — فقط برای پیست!',
+      buildKart(0xd63c3c, 1), x, z, heading,
+      { maxSpeed: 24, accel: 13, radius: 1.15, type: 'kart' });
+    // کات‌های پارک‌شدهٔ کنار پیست
+    this._addVehicle('kart2', 'کات آبی', 'کات آمادهٔ پیست', buildKart(0x3b82f6, 2),
+      x - 3.2, z - 2.4, heading + 0.3, { maxSpeed: 22, accel: 12, radius: 1.15, type: 'kart' });
+    this._addVehicle('kart3', 'کات سبز', 'کات آمادهٔ پیست', buildKart(0x22c55e, 3),
+      x + 3.2, z - 2.4, heading - 0.3, { maxSpeed: 22, accel: 12, radius: 1.15, type: 'kart' });
+    return kart;
+  }
 
   nearest(x, z, maxR = 3.2) {
     let best = null, bd = maxR;
