@@ -8,6 +8,11 @@ CJ_ADMIN=/tmp/gid_admin.txt
 rm -f $CJ1 $CJ2 $CJ_ADMIN
 PASS=0; FAIL=0
 
+# Dedicated User-Agent so this run gets its own rate-limit bucket
+# (shared default "curl/x" buckets collide with manual load tests).
+SMOKE_UA="GAMER-ID-SMOKE/1.0 $$"
+curl() { command curl -A "$SMOKE_UA" "$@"; }
+
 check() {
   local name="$1" cond="$2"
   local ok=1

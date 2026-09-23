@@ -180,7 +180,7 @@ export function ProfileView({ username, initialEdit, viewerId, viewerRole }: { u
 
       {/* Stats + XP */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
-        <StatCard label={t('followers')} value={p.followers_count} href={`/${p.username}?tab=followers`} />
+        <StatCard label={t('followers')} value={p.followers_count} />
         <StatCard label={t('following')} value={p.following_count} />
         <StatCard label={t('friends')} value={p.friends_count} />
         <StatCard label={t('posts')} value={p.postsCount} />

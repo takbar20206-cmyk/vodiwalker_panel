@@ -293,13 +293,7 @@ function PostCard({
 }
 
 function AchievementInline({ id }: { id: number }) {
-  const [ach, setAch] = useState<{ name: string; name_fa: string; xp_reward: number } | null>(null);
-  useEffect(() => {
-    fetch('/api/profile') // lightweight fallback; achievement details resolved via profile page
-      .then(() => setAch(null))
-      .catch(() => {});
-  }, [id]);
-  return <span className="font-bold text-[#ffd98a]">🏆 Achievement unlocked! {ach?.name || ' +XP'}</span>;
+  return <span className="font-bold text-[#ffd98a]">🏆 Achievement unlocked! +XP</span>;
 }
 
 export function Comments({ targetId, targetType, count }: { targetId: number; targetType: 'post' | 'clip'; count: number }) {

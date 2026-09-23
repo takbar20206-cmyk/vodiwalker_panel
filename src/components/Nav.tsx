@@ -80,7 +80,7 @@ function SearchOverlay({ open, onClose }: { open: boolean; onClose: () => void }
           ))}
           {data.games.length > 0 && <ResultHeader label={t('games')} />}
           {data.games.map((g: any) => (
-            <button key={`g${g.id}`} onClick={() => go(`/games?highlight=${g.id}`)} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#00a8ff]/10 transition text-start">
+            <button key={`g${g.id}`} onClick={() => go(`/games`)} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#00a8ff]/10 transition text-start">
               <div className="h-9 w-14 rounded-md overflow-hidden bg-[#151a29] flex items-center justify-center text-xs font-bold" style={{ color: g.accent }}>{g.name.slice(0, 6)}</div>
               <div className="font-bold text-sm">{g.name}</div>
             </button>
@@ -94,7 +94,7 @@ function SearchOverlay({ open, onClose }: { open: boolean; onClose: () => void }
           ))}
           {data.clips.length > 0 && <ResultHeader label={t('search_clips')} />}
           {data.clips.map((c: any) => (
-            <button key={`cl${c.id}`} onClick={() => go(`/explore?clip=${c.id}`)} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#00a8ff]/10 transition text-start">
+            <button key={`cl${c.id}`} onClick={() => go(`/explore`)} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#00a8ff]/10 transition text-start">
               <div className="h-9 w-14 rounded-md bg-[#151a29] flex items-center justify-center">▶</div>
               <div>
                 <div className="font-bold text-sm">{c.title}</div>

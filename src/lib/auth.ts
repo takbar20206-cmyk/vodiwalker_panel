@@ -74,7 +74,7 @@ export type SessionUser = {
   is_active: number;
 };
 
-export async function createSession(userId: number, userAgent = ''): Promise<string> {
+export async function createSession(userId: number, userAgent = '', secure = false): Promise<string> {
   const db = getDb();
   const token = randomToken();
   const expires = new Date(Date.now() + SESSION_DAYS * 86400000).toISOString();
@@ -87,7 +87,9 @@ export async function createSession(userId: number, userAgent = ''): Promise<str
     sameSite: 'lax',
     path: '/',
     maxAge: SESSION_DAYS * 86400,
-    secure: process.env.NODE_ENV === 'production' && process.env.FORCE_INSECURE_COOKIE !== '1',
+    // Only mark Secure when the edge proxy actually terminates TLS (x-forwarded-proto).
+    // Hardcoding Secure in production broke login behind HTTP previews/reverse proxies.
+    secure,
   });
   return token;
 }
@@ -144,7 +146,7 @@ export class ApiError extends Error {
   }
 }
 
-/* ---------- Rate limiting (per-IP, in-memory) ---------- */
+/* ---------- Rate limiting (per-IP + per-browser, in-memory) ---------- */
 const buckets = new Map<string, { count: number; reset: number }>();
 
 export function rateLimit(key: string, limit: number, windowMs: number): void {
@@ -159,7 +161,8 @@ export function rateLimit(key: string, limit: number, windowMs: number): void {
   }
   b.count += 1;
   if (b.count > limit) {
-    throw new ApiError(429, 'RATE_LIMITED', 'Too many requests, please slow down');
+    const waitSec = Math.max(1, Math.ceil((b.reset - now) / 1000));
+    throw new ApiError(429, 'RATE_LIMITED', `Too many requests — try again in ${waitSec}s`);
   }
 }
 

@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db';
 import { ApiError, rateLimit, str, EMAIL_RE, hashPassword, randomToken } from '@/lib/auth';
-import { json, handleError, clientIp } from '@/lib/api';
+import { json, handleError, browserKey } from '@/lib/api';
 
 export async function POST(req: NextRequest) {
   try {
-    rateLimit(`forgot:${clientIp(req)}`, 5, 300_000);
+    rateLimit(`forgot:${browserKey(req)}`, 8, 300_000);
     const body = await req.json().catch(() => ({}));
     const email = str(body.email, 200).toLowerCase();
     if (!EMAIL_RE.test(email)) throw new ApiError(400, 'VALIDATION', 'Invalid email');
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 /** Confirm reset with token */
 export async function PUT(req: NextRequest) {
   try {
-    rateLimit(`reset:${clientIp(req)}`, 10, 300_000);
+    rateLimit(`reset:${browserKey(req)}`, 15, 300_000);
     const body = await req.json().catch(() => ({}));
     const token = str(body.token, 200);
     const password = String(body.password ?? '');

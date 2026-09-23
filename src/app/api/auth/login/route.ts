@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db';
 import { verifyPassword, createSession, ApiError, rateLimit, str, requireFields } from '@/lib/auth';
-import { json, handleError, clientIp } from '@/lib/api';
+import { json, handleError, browserKey, isHttps } from '@/lib/api';
 import { awardXp } from '@/lib/xp';
 
 export async function POST(req: NextRequest) {
   try {
-    rateLimit(`login:${clientIp(req)}`, 15, 60_000);
+    rateLimit(`login:${browserKey(req)}`, 30, 60_000);
     const body = await req.json().catch(() => ({}));
     requireFields(body, ['identifier', 'password']);
     const identifier = str(body.identifier, 200);
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       dailyXp = 20;
     }
 
-    await createSession(user.id, req.headers.get('user-agent') ?? '');
+    await createSession(user.id, req.headers.get('user-agent') ?? '', isHttps(req));
     const profile = db
       .prepare(
         `SELECT u.username, u.email, u.role, p.display_name, p.level, p.xp, p.avatar_path

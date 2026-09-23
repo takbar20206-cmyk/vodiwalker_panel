@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db';
 import { hashPassword, createSession, ApiError, rateLimit, requireFields, str, USERNAME_RE, EMAIL_RE } from '@/lib/auth';
-import { json, handleError, clientIp } from '@/lib/api';
+import { json, handleError, browserKey, isHttps } from '@/lib/api';
 import { awardXp } from '@/lib/xp';
 
 export async function POST(req: NextRequest) {
   try {
-    rateLimit(`register:${clientIp(req)}`, 10, 60_000);
+    rateLimit(`register:${browserKey(req)}`, 15, 60_000);
     const body = await req.json().catch(() => ({}));
     requireFields(body, ['username', 'email', 'password', 'passwordConfirm']);
     const username = str(body.username, 24);
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     db.prepare('INSERT INTO profiles (user_id, display_name) VALUES (?, ?)').run(userId, username);
 
     awardXp(userId, 'DAILY_LOGIN'); // signup day
-    await createSession(userId, req.headers.get('user-agent') ?? '');
+    await createSession(userId, req.headers.get('user-agent') ?? '', isHttps(req));
 
     return json({ ok: true, user: { id: userId, username, email, role } }, 201);
   } catch (e) {

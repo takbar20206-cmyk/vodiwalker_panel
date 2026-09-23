@@ -40,6 +40,11 @@ export default function SquadsPage() {
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
+  // support /squads?mine=1 deep link (e.g. from notifications)
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('mine') === '1') setTab('mine');
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);

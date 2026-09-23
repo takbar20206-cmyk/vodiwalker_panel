@@ -41,13 +41,13 @@ const AppCtx = createContext<Ctx | null>(null);
 // minimal dictionary access — falls back to key
 import { dict } from '@/lib/i18n';
 
-export function AppProvider({ children }: { children: ReactNode }) {
+export function AppProvider({ children, initialLang = 'fa' }: { children: ReactNode; initialLang?: 'fa' | 'en' }) {
   const [user, setUser] = useState<Me>(null);
   const [loading, setLoading] = useState(true);
   const [unread, setUnread] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [toasts, setToasts] = useState<{ id: number; msg: string; kind: string }[]>([]);
-  const [lang, setLangState] = useState<'fa' | 'en'>('fa');
+  const [lang, setLangState] = useState<'fa' | 'en'>(initialLang);
   const router = useRouter();
 
   const toast = useCallback((msg: string, kind: 'success' | 'error' = 'success') => {
@@ -72,13 +72,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const c = document.cookie.match(/gid_lang=(fa|en)/);
-    if (c) setLangState(c[1] as 'fa' | 'en');
     refresh();
+    // httpOnly session cookies are invisible to JS — always refresh while tab is visible
     const iv = setInterval(() => {
-      if (document.cookie.includes('gid_session')) refresh();
+      if (!document.hidden) refresh();
     }, 45000);
-    return () => clearInterval(iv);
+    const onVisible = () => { if (!document.hidden) refresh(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [refresh]);
 
   const setLang = useCallback((l: 'fa' | 'en') => {

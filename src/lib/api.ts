@@ -32,6 +32,26 @@ export function clientIp(req: NextRequest): string {
   );
 }
 
+/** True only when the proxy terminates TLS — used for cookie `Secure` flag. */
+export function isHttps(req: NextRequest): boolean {
+  return (req.headers.get('x-forwarded-proto') || req.headers.get('x-forwarded-protocol') || '')
+    .toLowerCase()
+    .split(',')[0]
+    .trim()
+    .startsWith('https');
+}
+
+/**
+ * Per-browser bucket discriminator: previews often share one IP (or expose none),
+ * so keying only by IP made one user's retries lock everyone else out.
+ */
+export function browserKey(req: NextRequest): string {
+  const ua = req.headers.get('user-agent') || 'na';
+  let h = 5381;
+  for (let i = 0; i < ua.length; i++) h = ((h << 5) + h + ua.charCodeAt(i)) >>> 0;
+  return `${clientIp(req)}#${h.toString(36)}`;
+}
+
 /* ---------------- Upload validation ---------------- */
 
 const IMAGE_TYPES: Record<string, string> = {

@@ -26,7 +26,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={lang} dir={dir} className="dark">
       <body>
-        <AppProvider>
+        <AppProvider initialLang={lang as 'fa' | 'en'}>
           <Navbar />
           <main className="min-h-[calc(100vh-4rem)] pb-24 md:pb-10">{children}</main>
           <BottomNav />
