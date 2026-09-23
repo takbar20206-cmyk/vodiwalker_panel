@@ -26,6 +26,7 @@
     <div class="load-bar"><div id="load-bar-fill"></div></div>
     <p id="load-msg">در حال بارگذاری...</p>
     <p id="load-tip">💡 نکته: با کلید E می‌توانی با دیگران صحبت کنی.</p>
+    <p id="load-build" class="load-build"></p>
   </div>
 </div>
 
@@ -65,7 +66,7 @@
 <!-- ===== منوی اصلی ===== -->
 <div id="main-menu" class="overlay hidden">
   <div class="menu-box">
-    <div class="menu-badge">نسخه ۱٫۰ — کاملاً اورجینال</div>
+    <div class="menu-badge">نسخهٔ <span id="menu-build">۴</span> — نسخهٔ گسترش‌یافته (شهر، خوابگاه، استخر، آزمایشگاه، پیست)</div>
     <h1 class="game-title">School Life<br><span>Open Campus</span></h1>
     <p class="game-sub">یک روز کامل در دبیرستان آفتاب — بگرد، مأموریت انجام بده، رانندگی کن!</p>
     <div class="menu-btns">
@@ -246,6 +247,7 @@
      ۴) اگر همه شکست بخورند، پنل خطا با انتخاب دستی منبع‌ها نشان داده می‌شود.
    ============================================================ */
 (function () {
+  var BUILD = '4';   // شمارهٔ نسخه — برای اینکه معلوم شود صفحهٔ تازه لود شده یا نسخهٔ کش‌شده است
   var LOCAL = 'src/lib/three.module.js';
   var SOURCES = [
     LOCAL,
@@ -471,6 +473,14 @@
   });
   var crashReload = document.getElementById('crash-reload');
   if (crashReload) crashReload.addEventListener('click', function () { location.reload(); });
+
+  // نشان نسخه (اگر نسخهٔ قدیمی کش شده باشد، عدد قدیمی دیده می‌شود)
+  try {
+    var lb = document.getElementById('load-build');
+    if (lb) lb.textContent = 'نسخهٔ ' + BUILD + ' — اگر این نسخه را نمی‌بینی، صفحه از کش مرورگر آمده (Ctrl+Shift+R بزن)';
+    var mb = document.getElementById('menu-build');
+    if (mb) mb.textContent = BUILD;
+  } catch (e) { /* ignore */ }
 
   var retry = document.getElementById('boot-retry');
   if (retry) retry.addEventListener('click', function () { writeStage(0); location.reload(); });
