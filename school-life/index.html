@@ -3,12 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>School Life: Open Campus | زندگی در مدرسه</title>
 <meta name="description" content="یک بازی سه‌بعدی جهان‌باز مدرسه‌ای در مرورگر — School Life: Open Campus">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=3">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏫</text></svg>">
 </head>
 <body>
@@ -29,8 +32,11 @@
 <!-- ===== خطای لود موتور سه‌بعدی ===== -->
 <div id="boot-error" class="overlay hidden">
   <div class="panel small">
-    <h2>خطا در بارگذاری موتور سه‌بعدی</h2>
-    <p>برای اجرای بازی به اینترنت نیاز است تا کتابخانه Three.js دانلود شود.<br>اتصال اینترنت را بررسی کن و دوباره تلاش کن.</p>
+    <h2>موتور سه‌بعدی (Three.js) بارگذاری نشد</h2>
+    <p id="boot-error-why">کتابخانهٔ Three.js از هیچ‌یک از منابع زیر دانلود نشد. اینترنت را بررسی کن یا منبع دیگری را دستی امتحان کن:</p>
+    <div id="boot-sources"></div>
+    <p class="tip" id="boot-error-tip">راه‌حل دائمی و آفلاین: فایل <b>three.module.js</b> نسخهٔ 0.160.0 را دانلود کن و در پوشهٔ
+    <b>src/lib/</b> بگذار تا بازی بدون اینترنت هم اجرا شود (راهنمای کامل در README).</p>
     <button id="boot-retry" class="btn primary">تلاش دوباره</button>
   </div>
 </div>
@@ -215,12 +221,37 @@
 
 <!-- ===== بوت‌لودر: انتخاب CDN سالم برای Three.js ===== -->
 <script>
+/* ============================================================
+   بوت‌لودر Three.js — نسخهٔ ۳ (مقاوم در برابر CSP و قطع CDN)
+   روش کار:
+     ۱) اگر کپی محلی src/lib/three.module.js باشد، همان استفاده می‌شود.
+     ۲) وگرنه نوبتی از CDNها امتحان می‌شوند (jsDelivr → unpkg → ...).
+     ۳) چون importmap فقط یک‌بار و پیش از لود ماژول‌ها قابل تزریق است،
+        هر منبع در یک بارگذاری تازهٔ صفحه آزمایش می‌شود و شمارهٔ منبع
+        در sessionStorage (و در صورت نبود، در ?three=N) نگه داشته می‌شود.
+     ۴) اگر همه شکست بخورند، پنل خطا با انتخاب دستی منبع‌ها نشان داده می‌شود.
+   ============================================================ */
 (function () {
+  var LOCAL = 'src/lib/three.module.js';
   var SOURCES = [
-    'src/lib/three.module.js', // کپی محلی اختیاری (اجرای آفلاین) — راهنما در README
+    LOCAL,
+    'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js',
+    'https://unpkg.com/three@0.160.0/build/three.module.min.js',
     'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
-    'https://unpkg.com/three@0.160.0/build/three.module.js'
+    'https://unpkg.com/three@0.160.0/build/three.module.js',
+    'https://esm.run/three@0.160.0',
+    'https://esm.sh/three@0.160.0',
+    'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js'
   ];
+  var NAMES = [
+    'کپی محلی (آفلاین)', 'jsDelivr', 'unpkg', 'jsDelivr (کامل)', 'unpkg (کامل)',
+    'esm.run', 'esm.sh', 'cdnjs'
+  ];
+  /* چند منبع اول خودکار امتحان می‌شوند؛ بقیه در پنل خطا با کلیک */
+  var AUTO_TRY = 4;
+  var BUILD = '3';
+
+  /* ---------- چرخش نکته‌های صفحهٔ لودینگ ---------- */
   var TIPS = [
     '💡 نکته: با کلید E می‌توانی با دیگران صحبت کنی.',
     '🏁 کلید R: پیست مسابقهٔ آفتاب — با کات مسابقه رانندگی کن!',
@@ -241,47 +272,134 @@
     el.textContent = TIPS[tipI];
   }, 3500);
 
-  function tryHead(url, timeout) {
-    return new Promise(function (resolve) {
-      var done = false;
-      var timer = setTimeout(function () { if (!done) { done = true; resolve(false); } }, timeout);
-      fetch(url, { method: 'HEAD', cache: 'force-cache' }).then(function (r) {
-        if (!done) { done = true; clearTimeout(timer); resolve(!!(r && r.ok)); }
-      }).catch(function () {
-        if (!done) { done = true; clearTimeout(timer); resolve(false); }
-      });
-    });
-  }
-
-  function fail(msg) {
+  function msg(text) {
     var m = document.getElementById('load-msg');
-    if (m) m.textContent = msg;
-    document.getElementById('boot-error').classList.remove('hidden');
+    if (m) m.textContent = text;
+  }
+  function readStage() {
+    try {
+      var q = new URLSearchParams(location.search);
+      if (q.has('three')) return Math.max(0, parseInt(q.get('three'), 10) || 0);
+    } catch (e) { /* ignore */ }
+    try {
+      var v = sessionStorage.getItem('sloc-three');
+      if (v != null) return Math.max(0, parseInt(v, 10) || 0);
+    } catch (e) { /* ignore */ }
+    return 0;
+  }
+  function writeStage(n) {
+    try { sessionStorage.setItem('sloc-three', String(n)); } catch (e) { /* ignore */ }
+    try {
+      var q = new URLSearchParams(location.search);
+      q.set('three', String(n));
+      history.replaceState(null, '', location.pathname + '?' + q.toString());
+    } catch (e) { /* ignore */ }
   }
 
-  (async function boot() {
-    var msg = document.getElementById('load-msg');
-    if (msg) msg.textContent = 'اتصال به موتور سه‌بعدی...';
-    var chosen = null;
-    // اول کپی محلی (سریع fail می‌شود اگر نباشد)
-    if (await tryHead(SOURCES[0], 2500)) chosen = SOURCES[0];
-    // بعد CDNها
-    if (!chosen) {
-      if (msg) msg.textContent = 'دانلود موتور سه‌بعدی از اینترنت...';
-      if (await tryHead(SOURCES[1], 9000)) chosen = SOURCES[1];
-      else if (await tryHead(SOURCES[2], 9000)) chosen = SOURCES[2];
+  /* ---------- پنل خطا + انتخاب دستی منبع ---------- */
+  var _failed = false;
+  function showError(why) {
+    if (_failed) return;
+    _failed = true;
+    var box = document.getElementById('boot-error');
+    if (box) box.classList.remove('hidden');
+    var load = document.getElementById('loading');
+    if (load) load.classList.add('hidden');
+    var w = document.getElementById('boot-error-why');
+    if (w && why) w.textContent = why;
+    var list = document.getElementById('boot-sources');
+    if (list) {
+      list.innerHTML = '';
+      for (var i = 0; i < SOURCES.length; i++) {
+        (function (idx) {
+          var row = document.createElement('button');
+          row.className = 'btn small src-btn';
+          row.textContent = NAMES[idx] + (idx === 0 ? '' : ' — دانلود و اجرا');
+          row.onclick = function () {
+            writeStage(idx);
+            location.reload();
+          };
+          list.appendChild(row);
+        })(i);
+      }
     }
-    if (!chosen) { fail('اتصال ناموفق بود.'); return; }
+  }
+
+  function fail(text) {
+    showError(text);
+  }
+
+  function boot() {
+    var stage = readStage();
+    if (stage >= SOURCES.length) stage = 0;
+
+    // اگر کپی محلی هست، اول همان
+    if (stage === 0) {
+      msg('بررسی کپی محلی موتور سه‌بعدی...');
+      fetch(LOCAL, { method: 'GET', cache: 'no-store' }).then(function (r) {
+        if (r && r.ok) { run(0); } else { next(0); }
+      }).catch(function () { next(0); });
+      return;
+    }
+    run(stage);
+  }
+
+  function next(stage) {
+    var n = stage + 1;
+    if (n >= AUTO_TRY) {
+      fail('هیچ‌یک از منابع اول قابل دسترس نبود. یکی از منابع زیر را دستی امتحان کن (به اینترنت نیاز دارد):');
+      return;
+    }
+    writeStage(n);
+    msg('منبع بعدی: ' + NAMES[n] + ' ...');
+    location.reload();
+  }
+
+  function run(stage) {
+    var url = SOURCES[stage];
+    msg(stage === 0
+      ? 'بارگذاری موتور سه‌بعدی از کپی محلی...'
+      : 'دانلود موتور سه‌بعدی از ' + NAMES[stage] + ' ... (بار اول کمی طول می‌کشد)');
+
+    // نقشهٔ ایمپورت (importmap) باید پیش از هر ماژول تزریق شود
     var im = document.createElement('script');
     im.type = 'importmap';
-    im.textContent = JSON.stringify({ imports: { three: chosen } });
+    im.textContent = JSON.stringify({ imports: { three: url } });
     document.head.appendChild(im);
+
     var s = document.createElement('script');
     s.type = 'module';
-    s.src = 'src/main.js';
-    s.onerror = function () { fail('خطا در بارگذاری فایل‌های بازی.'); };
+    s.src = 'src/main.js?v=' + BUILD;
+    s.async = true;
+    s.onerror = function () {
+      // خود فایل‌های بازی یا موتور لود نشد → منبع بعدی
+      next(stage);
+    };
     document.body.appendChild(s);
-  })();
+
+    // اگر ۲۵ ثانیه بعد هنوز بازی ساخته نشده باشد: پیام راهنما (بدون ریلود پیاپی)
+    setTimeout(function () {
+      var started = (typeof window !== 'undefined') && window.__game;
+      if (started || _failed) return;
+      msg('هنوز در حال بارگذاری... اگر اینترنت کند است کمی صبر کن، در غیر این صورت یکی از منابع دیگر را امتحان کن.');
+      fail('بارگذاری کند یا ناتمام ماند. یک منبع دیگر را دستی امتحان کن یا صفحه را دوباره بارگذاری کن:');
+    }, 25000);
+
+    // خطای شبکه/لود ماژول سه‌بعدی را بگیر و منبع بعدی را امتحان کن
+    try {
+      var onErr = function (ev) {
+        var t = ev && ev.target;
+        if (t && t.tagName === 'SCRIPT' && t.src && String(t.src).indexOf('three') >= 0) next(stage);
+      };
+      if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('error', onErr, true);
+      else if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('error', onErr, true);
+    } catch (e) { /* ignore */ }
+  }
+
+  var retry = document.getElementById('boot-retry');
+  if (retry) retry.addEventListener('click', function () { writeStage(0); location.reload(); });
+
+  boot();
 })();
 </script>
 </body>
