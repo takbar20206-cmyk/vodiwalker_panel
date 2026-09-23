@@ -44,13 +44,28 @@ export class Mesh extends Obj { constructor(g, m) { super(); this.isMesh = true;
 export class Sprite extends Obj { constructor(m) { super(); this.isSprite = true; this.material = m; } }
 export class Points extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; } }
 class Geo { translate() { return this; } rotateX() { return this; } rotateZ() { return this; } computeBoundingSphere() { return this; } computeVertexNormals() { return this; } dispose() { return this; } setDrawRange() { return this; } }
-export class BoxGeometry extends Geo { constructor() { super(); } }
-export class SphereGeometry extends Geo { constructor() { super(); } }
-export class CylinderGeometry extends Geo { constructor() { super(); } }
-export class ConeGeometry extends Geo { constructor() { super(); } }
-export class PlaneGeometry extends Geo { constructor() { super(); } }
-export class RingGeometry extends Geo { constructor() { super(); } }
-export class TorusGeometry extends Geo { constructor() { super(); } }
+/* پارامترها مثل Three.js واقعی ذخیره می‌شوند (بعضی کدها از geometry.parameters استفاده می‌کنند) */
+export class BoxGeometry extends Geo {
+  constructor(w, h, d, ws, hs, ds) { super(); this.parameters = { width: w, height: h, depth: d, widthSegments: ws, heightSegments: hs, depthSegments: ds }; }
+}
+export class PlaneGeometry extends Geo {
+  constructor(w, h, ws, hs) { super(); this.parameters = { width: w, height: h, widthSegments: ws, heightSegments: hs }; }
+}
+export class SphereGeometry extends Geo {
+  constructor(r, ws, hs, ps, pl, ts, tl) { super(); this.parameters = { radius: r, widthSegments: ws, heightSegments: hs, phiStart: ps, phiLength: pl, thetaStart: ts, thetaLength: tl }; }
+}
+export class CylinderGeometry extends Geo {
+  constructor(rt, rb, h, rs, hs, oe, ts, tl) { super(); this.parameters = { radiusTop: rt, radiusBottom: rb, height: h, radialSegments: rs, heightSegments: hs, openEnded: oe, thetaStart: ts, thetaLength: tl }; }
+}
+export class ConeGeometry extends Geo {
+  constructor(r, h, rs, hs, oe, ts, tl) { super(); this.parameters = { radius: r, height: h, radialSegments: rs, heightSegments: hs, openEnded: oe, thetaStart: ts, thetaLength: tl }; }
+}
+export class RingGeometry extends Geo {
+  constructor(ir, or_, ts, ps, pl) { super(); this.parameters = { innerRadius: ir, outerRadius: or_, thetaSegments: ts, phiSegments: ps, thetaLength: pl }; }
+}
+export class TorusGeometry extends Geo {
+  constructor(r, t, rs, tts, arc) { super(); this.parameters = { radius: r, tube: t, radialSegments: rs, tubularSegments: tts, arc }; }
+}
 export class BufferGeometry extends Geo { setAttribute() { return this; } setIndex(i) { this.index = i; return this; } }
 export class BufferAttribute { constructor(a, n) { this.array = a; } setUsage() { return this; } }
 class Mat { constructor(p) { Object.assign(this, p || {}); if (typeof this.color === 'number') this.color = new Color(this.color); } }

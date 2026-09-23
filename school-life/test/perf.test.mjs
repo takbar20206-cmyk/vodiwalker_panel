@@ -62,7 +62,7 @@ function countCanvasOps() {
 }
 
 function countObjects(root) {
-  let total = 0, meshes = 0, lights = 0, sprites = 0, instanced = 0, points = 0, shadows = 0;
+  let total = 0, meshes = 0, lights = 0, sprites = 0, instanced = 0, points = 0, shadows = 0, nearShadows = 0;
   const seen = new Set();
   const walk = (o) => {
     if (!o || seen.has(o)) return;
@@ -71,7 +71,7 @@ function countObjects(root) {
     const t = o.constructor && o.constructor.name;
     if (t === 'Mesh') meshes++;
     if (t === 'InstancedMesh') { meshes++; instanced++; }
-    if (o.castShadow) shadows++;
+    if (o.castShadow) { shadows++; if (o.position && Math.abs(o.position.x) <= 60 && Math.abs(o.position.z) <= 60) nearShadows++; }
     if (t === 'Sprite') sprites++;
     if (t === 'Points') points++;
     if (t && t.endsWith('Light')) lights++;
@@ -79,7 +79,7 @@ function countObjects(root) {
     for (const c of kids) walk(c);
   };
   walk(root);
-  return { total, meshes, lights, sprites, instanced, points, shadows };
+  return { total, meshes, lights, sprites, instanced, points, shadows, nearShadows };
 }
 
 async function main() {
@@ -124,6 +124,8 @@ async function main() {
   ok('حافظهٔ تکسچر زیر ۴۰ مگابایت', opsReport.texBytes / 1048576 < 40, (opsReport.texBytes / 1048576).toFixed(1) + ' MiB');
   ok('عملیات رسم تکسچر زیر ۴۰۰ هزار', opsReport.calls < 400000, opsReport.calls.toLocaleString('en-US') + ' op');
   ok('مِش سایه‌انداز زیر ۱۵۰۰ (هزینهٔ پاس سایه)', stats.shadows < 1500, stats.shadows + ' shadow caster');
+  ok('سایه‌اندازهای داخل جعبهٔ سایهٔ ۹۶متری زیر ۸۵۰ (پاس سایه سبک)',
+    stats.nearShadows < 850, stats.nearShadows + ' caster در محدودهٔ سایه');
 
   console.log('== سنگین‌ترین‌ها ==');
   const byType = {};

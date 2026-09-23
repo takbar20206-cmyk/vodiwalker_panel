@@ -71,9 +71,15 @@ class Game {
     window.__slocSetLoad = (p, m) => this.ui.setLoad(p, m);
     this.ui.setLoad(3, 'راه‌اندازی موتور سه‌بعدی...');
 
-    // رندرر
+    // رندرر — روی دستگاه‌های ضعیف antialias خاموش می‌شود (تفاوت FPS زیاد است)
+    const nav = (typeof navigator !== 'undefined' ? navigator : {});
+    const weakDevice = (nav.hardwareConcurrency && nav.hardwareConcurrency <= 4) ||
+      (nav.deviceMemory && nav.deviceMemory <= 4) ||
+      (nav.userAgent && /Android|Adreno|Mali|PowerVR/i.test(nav.userAgent));
+    this.weakDevice = !!weakDevice;
+    if (this.weakDevice && this.settings.quality === 'high') this.settings.quality = 'medium';
     try {
-      this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      this.renderer = new THREE.WebGLRenderer({ antialias: !this.weakDevice, powerPreference: 'high-performance' });
     } catch (e) {
       document.getElementById('webgl-error').classList.remove('hidden');
       document.getElementById('loading').classList.add('hidden');
@@ -103,10 +109,14 @@ class Game {
     this.sun = new THREE.DirectionalLight(0xfff4e0, 1.2);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(1024, 1024);
-    this.sun.shadow.camera.left = -90; this.sun.shadow.camera.right = 90;
-    this.sun.shadow.camera.top = 90; this.sun.shadow.camera.bottom = -90;
-    this.sun.shadow.camera.near = 10; this.sun.shadow.camera.far = 450;
+    // جعبهٔ سایه کوچک‌تر (۹۶×۹۶ متر) و همراه بازیکن حرکت می‌کند:
+    // هم سایه‌ها واضح‌تر می‌شوند، هم پاس سایه فقط اشیای نزدیک را می‌کشد
+    this.shadowHalf = 48;
+    this.sun.shadow.camera.left = -this.shadowHalf; this.sun.shadow.camera.right = this.shadowHalf;
+    this.sun.shadow.camera.top = this.shadowHalf; this.sun.shadow.camera.bottom = -this.shadowHalf;
+    this.sun.shadow.camera.near = 20; this.sun.shadow.camera.far = 420;
     this.sun.shadow.bias = -0.0008;
+    if (this.sun.shadow.camera.updateProjectionMatrix) this.sun.shadow.camera.updateProjectionMatrix();
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
     this.hemi = new THREE.HemisphereLight(0xbfe3f5, 0x6a7a52, 0.7);
@@ -837,6 +847,8 @@ class Game {
     this._updateRide();
     // نورهای ساخته‌شده در این مرحله هم به استخر منتقل می‌شوند
     this.lightPool.collect();
+    // اشیای کوچک سایه نمی‌اندازند (پاس سایه سبک‌تر = FPS بالاتر)
+    this._shadowTrim = this._optimizeShadows();
   }
 
   /* ================= دوچرخه و تخته‌اسکیت ================= */
@@ -962,16 +974,20 @@ class Game {
     const dusk = clamp(1 - Math.abs(elev) * 3.2, 0, 1);
 
     const dir = new THREE.Vector3(Math.cos(ang), Math.max(elev, -0.4), 0.38).normalize();
+    // نقطهٔ مرکز سایه‌ها = بازیکن (یا ماشین در حال رانندگی)
+    const fx = this.vehicles && this.vehicles.active ? this.vehicles.active.x : (this.player ? this.player.x : 0);
+    const fz = this.vehicles && this.vehicles.active ? this.vehicles.active.z : (this.player ? this.player.z : 0);
     if (elev > -0.05) {
-      this.sun.position.copy(dir).multiplyScalar(170);
+      this.sun.position.set(fx + dir.x * 150, dir.y * 150 + 20, fz + dir.z * 150);
       this.sun.intensity = 0.25 + day01 * 1.1;
       this.sun.color.setHex(0xfff4e0).lerp(new THREE.Color(0xff9a4d), dusk * 0.7);
     } else {
       // ماه
-      this.sun.position.set(-60, 110, 50);
+      this.sun.position.set(fx - 60, 110, fz + 50);
       this.sun.intensity = 0.22;
       this.sun.color.setHex(0x8fa8d8);
     }
+    this.sun.target.position.set(fx, 0, fz);
     this.hemi.intensity = 0.28 + day01 * 0.5;
     this.hemi.color.setHex(0xbfe3f5).lerp(new THREE.Color(0x27325e), night01 * 0.9);
     this.hemi.groundColor.setHex(0x6a7a52).lerp(new THREE.Color(0x11131a), night01 * 0.85);
@@ -984,6 +1000,25 @@ class Game {
     this.world.setSky(sky, dir, night01, day01, elev > -0.05);
     this.world.setOutdoorLights(this.outdoorLightsOn, night01);
     this._isDay = day01 > 0.4;
+  }
+
+  /* ================= بهینه‌سازی سایه‌ها =================
+     هر مِش سایه‌انداز یک draw call اضافه در پاس سایه است. اشیای
+     کوچک (زیر ۴۰ سانتی‌متر) سایه‌انداز خاموش می‌شوند. */
+  _optimizeShadows() {
+    if (!this.scene) return 0;
+    let off = 0;
+    this.scene.traverse((o) => {
+      if (!o || o.isMesh !== true || o.castShadow !== true) return;
+      const p = o.geometry && o.geometry.parameters;
+      if (!p) return;
+      let max = 0;
+      if (p.width != null) max = Math.max(p.width, p.height || 0, p.depth || 0);
+      else if (p.height != null) max = Math.max(p.height, (p.radiusTop || p.radius || 0) * 2, (p.radiusBottom || 0) * 2);
+      else if (p.radius != null) max = p.radius * 2;
+      if (max > 0 && max < 0.4) { o.castShadow = false; off++; }
+    });
+    return off;
   }
 
   /* ================= تنظیم خودکار کیفیت =================
