@@ -23,6 +23,7 @@ import { RaceManager, RACE_MODES } from './racing.js';
 import { GradeBook } from './grades.js';
 import { StoryManager } from './story.js';
 import { PartySystem } from './party.js';
+import { LightPool } from './lights.js';
 
 const DAY_LENGTH = 720; // ثانیه برای یک شبانه‌روز کامل
 
@@ -83,8 +84,17 @@ class Game {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     document.getElementById('scene').appendChild(this.renderer.domElement);
     this.canvas = this.renderer.domElement;
+    // اگر کارت گرافیک کانتکست را از دست داد، به‌جای صفحهٔ یخ‌زده پیام بده
+    this.canvas.addEventListener && this.canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this.ui.showCrash('ارتباط با گرافیک مرورگر قطع شد (WebGL context lost).',
+        'معمولاً با بارگذاری دوباره حل می‌شود. اگر تکرار شد، کیفیت را در تنظیمات روی «کم» بگذار.');
+    }, false);
 
     this.scene = new THREE.Scene();
+    this.lightPool = new LightPool(this.scene, null, 6);
+    this.lightPool.enabled = true;
+    this._lightSweep = 0;
     this.scene.background = new THREE.Color(0x8ec9ee);
     this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1200);
     this.camera.position.set(0, 8, 55);
@@ -108,9 +118,12 @@ class Game {
     // دنیا (بارگذاری مرحله‌ای)
     this.world = new World(this.scene);
     await this.world.build((p, m) => this.ui.setLoad(3 + p * 0.4, m));
+    this.lightPool.world = this.world;   // برای تشخیص چراغ‌های بیرونی
+    this.lightPool.collect();
 
     this.ui.setLoad(44, 'گسترش دنیا: شهر، استخر، آزمایشگاه، خوابگاه...');
     await buildExtension(this.world, (p, m) => this.ui.setLoad(44 + p * 0.38, m), this._extHooks());
+    this.lightPool.collect();
 
     this.ui.setLoad(78, 'آوردن دانش‌آموزان و معلم‌ها...');
     await this._tick();
@@ -140,7 +153,20 @@ class Game {
     this.applyQuality();
     this._wireEvents();
     this._dayNight(); // نور اولیه
+
+    // آماده‌سازی گرافیک: کامپایل شیدرها پیش از ورود به بازی
+    // (اگر این مرحله نباشد، اولین فریم می‌تواند صفحه را چند ثانیه قفل کند)
+    this.ui.setLoad(98, 'آماده‌سازی گرافیک و کامپایل شیدرها...');
+    await this._tick();
+    if (this.renderer && typeof this.renderer.compile === 'function') {
+      try { this.renderer.compile(this.scene, this.camera); } catch (e) { /* بی‌اهمیت */ }
+    }
+    await this._tick();
+
     this.ui.setLoad(100, 'آماده!');
+    // استخر نور: همهٔ PointLightهای صحنه به منبع تبدیل می‌شوند و فقط
+    // تعداد ثابتی چراغ فعال می‌ماند (جلوگیری از کندی شدید رندر)
+    this.lightPool.collect();
     this.clock = new THREE.Clock();
     this.state = 'menu';
 
@@ -783,6 +809,7 @@ class Game {
     else if (q === 'medium') { fog.near = 60; fog.far = 200; }
     else { fog.near = 80; fog.far = 300; }
     this.outdoorLightsOn = q !== 'low';
+    if (this.lightPool) this.lightPool.setEnabled(q !== 'low');
     if (this.world) this.world.setQuality(q);
     if (this.npcs) this.npcs.setQuality(q);
     if (this.weather) this.weather.setQuality(q);
@@ -808,6 +835,8 @@ class Game {
     this.racing.build();
     // دوچرخه و تخته‌اسکیت در انبار بازیکن
     this._updateRide();
+    // نورهای ساخته‌شده در این مرحله هم به استخر منتقل می‌شوند
+    this.lightPool.collect();
   }
 
   /* ================= دوچرخه و تخته‌اسکیت ================= */
@@ -929,6 +958,7 @@ class Game {
     const elev = Math.sin(ang);
     const day01 = clamp((elev + 0.06) / 0.28, 0, 1);
     const night01 = 1 - day01;
+    this.night01 = night01;
     const dusk = clamp(1 - Math.abs(elev) * 3.2, 0, 1);
 
     const dir = new THREE.Vector3(Math.cos(ang), Math.max(elev, -0.4), 0.38).normalize();
@@ -954,6 +984,36 @@ class Game {
     this.world.setSky(sky, dir, night01, day01, elev > -0.05);
     this.world.setOutdoorLights(this.outdoorLightsOn, night01);
     this._isDay = day01 > 0.4;
+  }
+
+  /* ================= تنظیم خودکار کیفیت =================
+     اگر دستگاه کند باشد (فریم‌های طولانی)، کیفیت یک پله پایین می‌آید تا
+     بازی روان بماند. حداکثر دو بار و فقط وقتی واقعاً کند است. */
+  _autoQuality() {
+    const nowMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    if (!this._aq) this._aq = { n: 0, sum: 0, steps: 0, last: nowMs, done: false };
+    const aq = this._aq;
+    if (aq.done) return;
+    const realDt = nowMs - aq.last;
+    aq.last = nowMs;
+    if (this.state !== 'playing' || this.paused || realDt <= 0 || realDt > 400) return;
+    aq.n++; aq.sum += realDt;
+    if (aq.n < 120) return;
+    const avgMs = aq.sum / aq.n;
+    aq.n = 0; aq.sum = 0;
+    const order = ['low', 'medium', 'high'];
+    const cur = order.indexOf(this.settings.quality);
+    if (avgMs > 50 && cur > 0) {
+      this.settings.quality = order[cur - 1];
+      this.settings.save();
+      this.applyQuality();
+      aq.steps++;
+      const label = { low: 'کم', medium: 'متوسط', high: 'بالا' }[this.settings.quality];
+      this.ui.toast('🐢 دستگاه کند بود: کیفیت گرافیک روی «' + label + '» تنظیم شد (از تنظیمات قابل تغییر است).');
+      if (aq.steps >= 2) aq.done = true;
+    } else {
+      aq.done = true;   // عملکرد خوب است
+    }
   }
 
   /* ================= حلقه اصلی ================= */
@@ -1090,6 +1150,12 @@ class Game {
       timeH: this.timeH,
     });
     this.voice.update(dt);
+    this._autoQuality();
+    // استخر نور: چراغ‌های نزدیک بازیکن روشن می‌مانند (تعداد ثابت = بدون کامپایل مجدد shader)
+    if (this.lightPool) {
+      this.lightPool.update(ppx, ppz, dt, this.night01 || 0);
+      if (--this._lightSweep <= 0) { this._lightSweep = 90; this.lightPool.collect(); }
+    }
     this._sawJump = this._sawJump || (this.jumpQueued && this.player.grounded);
     this._updateExtras(dt, ppx, ppz);
     const moved = dist2D(this._lastPX, this._lastPZ, ppx, ppz);

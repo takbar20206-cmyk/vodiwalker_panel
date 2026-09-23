@@ -5,37 +5,35 @@
 import * as THREE from 'three';
 import { clamp, resolveCollisions, pointBlocked, dist2D } from './utils.js';
 import { BOUNDS, PARKING_SPOTS } from './world.js';
-import { textSprite } from './gfx.js';
+import { geoBox, geoCyl, geoCylRotZ, matLambert, textSprite } from './gfx.js';
 
 function wheelMesh(r, w, mat) {
-  const geo = new THREE.CylinderGeometry(r, r, w, 12);
-  geo.rotateZ(Math.PI / 2);
-  const m = new THREE.Mesh(geo, mat);
+  const m = new THREE.Mesh(geoCylRotZ(r, r, w, 12), mat);
   m.castShadow = true;
   return m;
 }
 
 function buildCart(color) {
   const g = new THREE.Group();
-  const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
+  const mat = matLambert;
   const tire = mat(0x22242a);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.28, 2.9), mat(color));
+  const body = new THREE.Mesh(geoBox(1.7, 0.28, 2.9), mat(color));
   body.position.y = 0.6; body.castShadow = true; g.add(body);
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.18, 0.7), mat(0x3a3f47));
+  const seat = new THREE.Mesh(geoBox(1.5, 0.18, 0.7), mat(0x3a3f47));
   seat.position.set(0, 0.85, -0.5); g.add(seat);
-  const back = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.6, 0.15), mat(0x3a3f47));
+  const back = new THREE.Mesh(geoBox(1.5, 0.6, 0.15), mat(0x3a3f47));
   back.position.set(0, 1.15, -0.85); g.add(back);
-  const dash = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.4, 0.3), mat(0x2c313a));
+  const dash = new THREE.Mesh(geoBox(1.5, 0.4, 0.3), mat(0x2c313a));
   dash.position.set(0, 0.95, 1.1); g.add(dash);
   for (const [px, pz] of [[-0.8, -1.3], [0.8, -1.3], [-0.8, 1.3], [0.8, 1.3]]) {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.09, 1.4, 0.09), mat(0x2c313a));
+    const post = new THREE.Mesh(geoBox(0.09, 1.4, 0.09), mat(0x2c313a));
     post.position.set(px, 1.45, pz); g.add(post);
   }
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.12, 3.1), mat(0xf2ede0));
+  const roof = new THREE.Mesh(geoBox(1.9, 0.12, 3.1), mat(0xf2ede0));
   roof.position.y = 2.2; roof.castShadow = true; g.add(roof);
   for (const sx of [-0.55, 0.55]) {
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.18, 0.1),
-      new THREE.MeshLambertMaterial({ color: 0xfff6d8, emissive: 0xffdf80, emissiveIntensity: 0.6 }));
+    const lamp = new THREE.Mesh(geoBox(0.28, 0.18, 0.1),
+      matLambert(0xfff6d8, { emissive: 0xffdf80, emissiveIntensity: 0.6 }));
     lamp.position.set(sx, 0.72, 1.47); g.add(lamp);
   }
   const wheels = [];
@@ -53,16 +51,16 @@ function buildCart(color) {
 
 function buildScooter(color) {
   const g = new THREE.Group();
-  const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 1.5), mat(color));
+  const mat = matLambert;
+  const deck = new THREE.Mesh(geoBox(0.5, 0.12, 1.5), mat(color));
   deck.position.y = 0.35; deck.castShadow = true; g.add(deck);
-  const col = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.9, 0.12), mat(0x2c313a));
+  const col = new THREE.Mesh(geoBox(0.12, 0.9, 0.12), mat(0x2c313a));
   col.position.set(0, 0.8, 0.65); col.rotation.x = 0.25; g.add(col);
-  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.09, 0.09), mat(0x2c313a));
+  const bar = new THREE.Mesh(geoBox(0.55, 0.09, 0.09), mat(0x2c313a));
   bar.position.set(0, 1.25, 0.55); g.add(bar);
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.14, 0.5), mat(0x22242a));
+  const seat = new THREE.Mesh(geoBox(0.45, 0.14, 0.5), mat(0x22242a));
   seat.position.set(0, 0.72, -0.35); g.add(seat);
-  const box = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.35), mat(0xf2ede0));
+  const box = new THREE.Mesh(geoBox(0.5, 0.4, 0.35), mat(0xf2ede0));
   box.position.set(0, 0.6, -0.75); g.add(box);
   const wheels = [];
   const front = new THREE.Group(); front.position.set(0, 0.28, 0.72);
@@ -75,16 +73,16 @@ function buildScooter(color) {
 
 function buildCar(color) {
   const g = new THREE.Group();
-  const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.62, 4.1), mat(color));
+  const mat = matLambert;
+  const body = new THREE.Mesh(geoBox(1.85, 0.62, 4.1), mat(color));
   body.position.y = 0.68; body.castShadow = true; g.add(body);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.55, 2.0), mat(0x22303e));
+  const cabin = new THREE.Mesh(geoBox(1.6, 0.55, 2.0), mat(0x22303e));
   cabin.position.set(0, 1.25, -0.2); cabin.castShadow = true; g.add(cabin);
   for (const sx of [-0.6, 0.6]) {
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.2, 0.12),
-      new THREE.MeshLambertMaterial({ color: 0xfff6d8, emissive: 0xffdf80, emissiveIntensity: 0.6 }));
+    const lamp = new THREE.Mesh(geoBox(0.35, 0.2, 0.12),
+      matLambert(0xfff6d8, { emissive: 0xffdf80, emissiveIntensity: 0.6 }));
     lamp.position.set(sx, 0.72, 2.07); g.add(lamp);
-    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.1), mat(0xa02323));
+    const tail = new THREE.Mesh(geoBox(0.3, 0.18, 0.1), mat(0xa02323));
     tail.position.set(sx, 0.75, -2.07); g.add(tail);
   }
   const wheels = [];
@@ -103,28 +101,28 @@ function buildCar(color) {
 /* ---------- کات مسابقه (Low-Poly) ---------- */
 export function buildKart(color, num) {
   const g = new THREE.Group();
-  const M = (c) => new THREE.MeshLambertMaterial({ color: c });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.34, 2.05), M(color));
+  const M = matLambert;
+  const body = new THREE.Mesh(geoBox(1.15, 0.34, 2.05), M(color));
   body.position.y = 0.44; body.castShadow = true; g.add(body);
-  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.2, 0.62), M(0xf2f2ea));
+  const nose = new THREE.Mesh(geoBox(0.78, 0.2, 0.62), M(0xf2f2ea));
   nose.position.set(0, 0.4, 1.24); g.add(nose);
-  const engine = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.5), M(0x33383f));
+  const engine = new THREE.Mesh(geoBox(0.42, 0.42, 0.5), M(0x33383f));
   engine.position.set(0, 0.66, -0.95); g.add(engine);
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.5, 0.52), M(0x2c313a));
+  const seat = new THREE.Mesh(geoBox(0.62, 0.5, 0.52), M(0x2c313a));
   seat.position.set(0, 0.7, -0.32); g.add(seat);
-  const wheelBar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.07, 0.07), M(0x22242a));
+  const wheelBar = new THREE.Mesh(geoBox(0.5, 0.07, 0.07), M(0x22242a));
   wheelBar.position.set(0, 0.86, 0.42); g.add(wheelBar);
-  const spoiler = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 0.32), M(0x22242a));
+  const spoiler = new THREE.Mesh(geoBox(0.95, 0.08, 0.32), M(0x22242a));
   spoiler.position.set(0, 0.88, -1.02); g.add(spoiler);
   for (const sx of [-0.38, 0.38]) {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.26, 0.07), M(0x22242a));
+    const post = new THREE.Mesh(geoBox(0.07, 0.26, 0.07), M(0x22242a));
     post.position.set(sx, 0.72, -1.02); g.add(post);
   }
   const wheels = [], steers = [];
   for (const [px, pz, st] of [[-0.64, 0.72, true], [0.64, 0.72, true], [-0.7, -0.68, false], [0.7, -0.68, false]]) {
     const pivot = new THREE.Group();
     pivot.position.set(px, 0.26, pz);
-    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.22, 10), M(0x1d1f24));
+    const w = new THREE.Mesh(geoCyl(0.27, 0.27, 0.22, 10), M(0x1d1f24));
     w.rotation.z = Math.PI / 2;
     w.castShadow = true;
     pivot.add(w);

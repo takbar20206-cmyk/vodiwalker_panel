@@ -5,7 +5,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { clamp, lerp, rand, randInt, choice, resolveCollisions, pointBlocked, inRect, dist2D } from './utils.js';
-import { canvasTexture, textSprite, SparkPool } from './gfx.js';
+import { SparkPool, canvasTexture, geoBox, geoCone, geoCyl, geoPlane, geoRing, geoSph, geoTorus, matLambert, textSprite } from './gfx.js';
 
 /* ---------- نقاط کلیدی مشترک با ماژول‌های دیگر ---------- */
 export const AREAS = {
@@ -189,7 +189,7 @@ export class World {
       }
     });
 
-    const L = (color, opts = {}) => new THREE.MeshLambertMaterial({ color, ...opts });
+    const L = matLambert;
     this.M = {
       white: L(0xf5f2ea), trim: L(0x8a6a45), roof: L(0x9c4f3c),
       schoolLow: new THREE.MeshLambertMaterial({ map: this.texSchoolLow }),
@@ -231,10 +231,12 @@ export class World {
 
   /* ---------------- ابزارهای ساخت ---------------- */
   box(w, h, d, mat, x, y, z, opts = {}) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    const m = new THREE.Mesh(geoBox(w, h, d), mat);
     m.position.set(x, y, z);
     if (opts.ry) m.rotation.y = opts.ry;
-    m.castShadow = opts.cast !== false;
+    // فقط اشیای بزرگ سایه می‌اندازند (سایه‌اندازی هر مِش کوچک، FPS را می‌خورد)
+    const big = Math.max(w, h, d) >= 0.45;
+    m.castShadow = opts.cast === true || (opts.cast !== false && big);
     m.receiveShadow = opts.recv !== false;
     (opts.parent || this.scene).add(m);
     if (opts.collider) {
@@ -245,7 +247,7 @@ export class World {
   }
 
   plane(w, d, mat, x, y, z, opts = {}) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
+    const m = new THREE.Mesh(geoPlane(w, d), mat);
     m.rotation.x = -Math.PI / 2;
     if (opts.ry) m.rotation.z = opts.ry;
     m.position.set(x, y, z);
@@ -311,7 +313,7 @@ export class World {
 
   /* ---------------- مرحله ۱: زمین و خیابان ---------------- */
   _buildGround() {
-    const g = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), this.M.grass);
+    const g = new THREE.Mesh(geoPlane(400, 400), this.M.grass);
     g.rotation.x = -Math.PI / 2;
     g.receiveShadow = true;
     this.scene.add(g);
@@ -329,7 +331,7 @@ export class World {
     this.mapRects.push({ x1: -75, z1: -58, x2: 75, z2: -50, c: '#3a3e45' });
 
     // خط‌کشی وسط خیابان (Instanced)
-    const dashGeo = new THREE.BoxGeometry(2.2, 0.02, 0.35);
+    const dashGeo = geoBox(2.2, 0.02, 0.35);
     const dashes = [];
     for (let x = -96; x <= 96; x += 6) { if (Math.abs(x) < 6) continue; dashes.push([x, 62, 0]); }
     for (let z = -56; z <= 66; z += 6) dashes.push([-74, z, Math.PI / 2]);
@@ -392,7 +394,7 @@ export class World {
 
     // کف و سقف داخلی
     this.plane(59.4, 13.4, this.M.floor, 0, 0.03, -27, {});
-    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(59.4, 13.4), this.M.ceil);
+    const ceil = new THREE.Mesh(geoPlane(59.4, 13.4), this.M.ceil);
     ceil.rotation.x = Math.PI / 2;
     ceil.position.set(0, H - 0.05, -27);
     this.scene.add(ceil);
@@ -445,7 +447,7 @@ export class World {
     // میز معلم + تخته
     this.box(1.8, 0.1, 0.9, this.M.deskTop, cx, 0.8, -31.8);
     this.box(1.7, 0.75, 0.8, this.M.wood, cx, 0.38, -31.8, { collider: true });
-    const board = new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.5, 0.12), this.M.board);
+    const board = new THREE.Mesh(geoBox(4.4, 1.5, 0.12), this.M.board);
     board.position.set(cx, 2.1, -33.65);
     this.scene.add(board);
     this.box(4.4, 0.08, 0.3, this.M.woodDark, cx, 1.3, -33.5);
@@ -454,7 +456,7 @@ export class World {
       this.box(0.6, 2.0, 4.2, this.M.shelf, -29.2, 1.0, -28, { collider: true });
     } else {
       // کره جغرافیا روی میز کلاس B
-      const gl = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), new THREE.MeshLambertMaterial({ color: 0x3b82f6 }));
+      const gl = new THREE.Mesh(geoSph(0.3, 10, 8), new THREE.MeshLambertMaterial({ color: 0x3b82f6 }));
       gl.position.set(cx + 1.2, 1.1, -31.8);
       this.scene.add(gl);
     }
@@ -468,9 +470,9 @@ export class World {
     this.box(0.6, 1.0, 0.6, this.M.woodDark, 19, 0.5, -31.2);
     this.box(0.7, 2.2, 3.4, this.M.shelf, 27.3, 1.1, -28, { collider: true });
     // گلدان
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.5, 8), this.M.roof);
+    const pot = new THREE.Mesh(geoCyl(0.3, 0.24, 0.5, 8), this.M.roof);
     pot.position.set(11, 0.25, -32.2); pot.castShadow = true; this.scene.add(pot);
-    const pl = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 6), this.M.bush);
+    const pl = new THREE.Mesh(geoSph(0.45, 8, 6), this.M.bush);
     pl.position.set(11, 0.85, -32.2); pl.castShadow = true; this.scene.add(pl);
     const t = textSprite('خانم رضایی — مدیر مدرسه', { height: 0.45, bg: '#5b1f1f' });
     t.position.set(19, 2.6, -32.8); this.scene.add(t);
@@ -496,7 +498,7 @@ export class World {
     // حلقه بسکتبال
     this.box(0.25, 4.5, 0.25, this.M.darkMetal, -58.5, 2.25, 17);
     this.box(0.1, 1.1, 1.7, this.M.white, -58.2, 3.8, 17);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.05, 6, 14), this.M.mat2);
+    const rim = new THREE.Mesh(geoTorus(0.35, 0.05, 6, 14), this.M.mat2);
     rim.rotation.x = Math.PI / 2;
     rim.position.set(-57.7, 3.4, 17);
     this.scene.add(rim);
@@ -517,7 +519,7 @@ export class World {
     this.mapLabels.push({ x: 43, z: -30, t: 'کتابخانه' });
     this.box(19, 0.5, 13, this.M.roof, 43, H2 + 0.25, -30);
     this.plane(17.4, 11.4, this.M.floor, 43, 0.03, -30);
-    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(17.4, 11.4), this.M.ceil);
+    const ceil = new THREE.Mesh(geoPlane(17.4, 11.4), this.M.ceil);
     ceil.rotation.x = Math.PI / 2; ceil.position.set(43, H2 - 0.05, -30);
     this.scene.add(ceil);
     // قفسه‌ها
@@ -559,13 +561,13 @@ export class World {
     this.mapLabels.push({ x: 44, z: 22, t: 'زمین فوتبال' });
     const lw = 0.3, ly = 0.035;
     const line = (w, d, x, z) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, d), this.M.lineWhite);
+      const m = new THREE.Mesh(geoBox(w, 0.02, d), this.M.lineWhite);
       m.position.set(x, ly, z); m.receiveShadow = true; this.scene.add(m);
     };
     line(43, lw, 44, 9.5); line(43, lw, 44, 34.5);
     line(lw, 25, 22.5, 22); line(lw, 25, 65.5, 22);
     line(lw, 25, 44, 22);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(2.8, 3.1, 28), this.M.lineWhite);
+    const ring = new THREE.Mesh(geoRing(2.8, 3.1, 28), this.M.lineWhite);
     ring.rotation.x = -Math.PI / 2; ring.position.set(44, ly, 22);
     this.scene.add(ring);
 
@@ -574,7 +576,7 @@ export class World {
     this._goal(65.5, 22, -1);
 
     // توپ
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.35, 14, 10), this.M.ball);
+    const ball = new THREE.Mesh(geoSph(0.35, 14, 10), this.M.ball);
     ball.castShadow = true;
     ball.position.set(44, 0.35, 22);
     this.scene.add(ball);
@@ -590,19 +592,19 @@ export class World {
   _goal(x, z, dir) {
     const postMat = this.M.white;
     const mkPost = (px, pz) => {
-      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.6, 8), postMat);
+      const p = new THREE.Mesh(geoCyl(0.09, 0.09, 2.6, 8), postMat);
       p.position.set(px, 1.3, pz); p.castShadow = true; this.scene.add(p);
     };
     mkPost(x, z - 2.5); mkPost(x, z + 2.5);
-    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 5.2, 8), postMat);
+    const bar = new THREE.Mesh(geoCyl(0.09, 0.09, 5.2, 8), postMat);
     bar.rotation.x = Math.PI / 2;
     bar.position.set(x, 2.6, z); bar.castShadow = true;
     this.scene.add(bar);
-    const net = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 2.6), this.M.net);
+    const net = new THREE.Mesh(geoPlane(5.2, 2.6), this.M.net);
     net.position.set(x - dir * 1.1, 1.3, z);
     net.rotation.y = Math.PI / 2;
     this.scene.add(net);
-    const top = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 5.2), this.M.net);
+    const top = new THREE.Mesh(geoPlane(1.2, 5.2), this.M.net);
     top.rotation.x = -Math.PI / 2; top.rotation.z = Math.PI / 2;
     top.position.set(x - dir * 0.55, 2.6, z);
     this.scene.add(top);
@@ -618,7 +620,7 @@ export class World {
     this.mapLabels.push({ x: -46, z: 45, t: 'پارکینگ' });
     for (let i = 0; i < 6; i++) {
       const x = -55 + i * 4;
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.02, 6), this.M.lineWhite);
+      const m = new THREE.Mesh(geoBox(0.25, 0.02, 6), this.M.lineWhite);
       m.position.set(x, 0.03, 44); this.scene.add(m);
     }
     const ps = textSprite('پارکینگ', { height: 0.7, bg: '#333a45' });
@@ -627,15 +629,15 @@ export class World {
 
     // فواره وسط حیاط
     const fx = LOC.fountain.x, fz = LOC.fountain.z;
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(3, 3.2, 0.75, 18), this.M.stone);
+    const base = new THREE.Mesh(geoCyl(3, 3.2, 0.75, 18), this.M.stone);
     base.position.set(fx, 0.37, fz); base.castShadow = base.receiveShadow = true;
     this.scene.add(base);
-    this.fountainWater = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.7, 0.15, 18), this.M.water);
+    this.fountainWater = new THREE.Mesh(geoCyl(2.7, 2.7, 0.15, 18), this.M.water);
     this.fountainWater.position.set(fx, 0.72, fz);
     this.scene.add(this.fountainWater);
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 1.8, 10), this.M.stone);
+    const col = new THREE.Mesh(geoCyl(0.35, 0.5, 1.8, 10), this.M.stone);
     col.position.set(fx, 1.4, fz); col.castShadow = true; this.scene.add(col);
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.8, 0.25, 12), this.M.stone);
+    const top = new THREE.Mesh(geoCyl(1.0, 0.8, 0.25, 12), this.M.stone);
     top.position.set(fx, 2.4, fz); top.castShadow = true; this.scene.add(top);
     this.addCollider(fx - 3.2, fz - 3.2, fx + 3.2, fz + 3.2);
     this.mapRects.push({ x1: fx - 3, z1: fz - 3, x2: fx + 3, z2: fz + 3, c: '#4fb3e8' });
@@ -651,7 +653,7 @@ export class World {
     // سطل‌های زباله
     this.bins = [[10, 14], [-10, -2], [20, 24], [-52, 40], [-40, 15], [32, -27]];
     for (const [x, z] of this.bins) {
-      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.34, 0.9, 10), new THREE.MeshLambertMaterial({ color: 0x2e7d4f }));
+      const b = new THREE.Mesh(geoCyl(0.4, 0.34, 0.9, 10), new THREE.MeshLambertMaterial({ color: 0x2e7d4f }));
       b.position.set(x, 0.45, z); b.castShadow = true; this.scene.add(b);
       this.addCollider(x - 0.4, z - 0.4, x + 0.4, z + 0.4);
     }
@@ -679,12 +681,12 @@ export class World {
   _bench(x, z, ry) {
     const g = new THREE.Group();
     g.position.set(x, 0, z); g.rotation.y = ry;
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.12, 0.6), this.M.bench);
+    const seat = new THREE.Mesh(geoBox(2.2, 0.12, 0.6), this.M.bench);
     seat.position.y = 0.55; seat.castShadow = true; g.add(seat);
-    const back = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.55, 0.1), this.M.bench);
+    const back = new THREE.Mesh(geoBox(2.2, 0.55, 0.1), this.M.bench);
     back.position.set(0, 0.9, -0.3); back.castShadow = true; g.add(back);
     for (const sx of [-0.9, 0.9]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, 0.55), this.M.benchIron);
+      const leg = new THREE.Mesh(geoBox(0.12, 0.55, 0.55), this.M.benchIron);
       leg.position.set(sx, 0.27, 0); g.add(leg);
     }
     this.scene.add(g);
@@ -694,11 +696,11 @@ export class World {
   }
 
   _lamp(x, z) {
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 4.6, 8), this.M.lampPost);
+    const pole = new THREE.Mesh(geoCyl(0.09, 0.13, 4.6, 8), this.M.lampPost);
     pole.position.set(x, 2.3, z); pole.castShadow = true; this.scene.add(pole);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), this.M.lampBulb);
+    const bulb = new THREE.Mesh(geoSph(0.28, 10, 8), this.M.lampBulb);
     bulb.position.set(x, 4.75, z); this.scene.add(bulb);
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.35, 8), this.M.lampPost);
+    const cap = new THREE.Mesh(geoCone(0.45, 0.35, 8), this.M.lampPost);
     cap.position.set(x, 5.05, z); this.scene.add(cap);
     this.addCollider(x - 0.2, z - 0.2, x + 0.2, z + 0.2);
     this.lamps.push({ x, z });
@@ -713,11 +715,11 @@ export class World {
     for (let i = 0; i < 7; i++) {
       const a = (i / 7) * Math.PI * 2;
       const sx = -54 + Math.cos(a) * 3.4, sz = -40 + Math.sin(a) * 3.4;
-      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 0.5, 7), this.M.stone);
+      const st = new THREE.Mesh(geoCyl(0.35, 0.45, 0.5, 7), this.M.stone);
       st.position.set(sx, 0.25, sz); st.castShadow = true; this.scene.add(st);
     }
     // نشان‌گر درخشان باغ مخفی
-    const ringM = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.12, 8, 24), this.M.marker);
+    const ringM = new THREE.Mesh(geoTorus(1.1, 0.12, 8, 24), this.M.marker);
     ringM.rotation.x = Math.PI / 2;
     ringM.position.set(-54, 0.15, -40);
     this.scene.add(ringM);
@@ -788,8 +790,8 @@ export class World {
     }
 
     const n = spots.length;
-    const trunkGeo = new THREE.CylinderGeometry(0.16, 0.3, 2.4, 6);
-    const crownGeo = new THREE.SphereGeometry(1.7, 8, 6);
+    const trunkGeo = geoCyl(0.16, 0.3, 2.4, 6);
+    const crownGeo = geoSph(1.7, 8, 6);
     this.treeTrunks = new THREE.InstancedMesh(trunkGeo, this.M.trunk, n);
     this.treeCrowns = new THREE.InstancedMesh(crownGeo, this.M.leaf, n);
     this.treeTrunks.castShadow = this.treeCrowns.castShadow = true;
@@ -822,7 +824,7 @@ export class World {
 
     // ---- علف‌ها (Instanced، کیفیت‌پذیر) ----
     const gCount = 450;
-    const tuft = new THREE.ConeGeometry(0.14, 0.42, 4);
+    const tuft = geoCone(0.14, 0.42, 4);
     this.grassMesh = new THREE.InstancedMesh(tuft, new THREE.MeshLambertMaterial({ color: 0x5d9840 }), gCount);
     let gi = 0; tries = 0;
     const noGrass = blocked.concat([
@@ -847,7 +849,7 @@ export class World {
     for (let i = 0; i < 16; i++) {
       const x = rand(-60, 60), z = rand(-40, 52);
       if (isBlocked(x, z, 1)) continue;
-      const b = new THREE.Mesh(new THREE.SphereGeometry(rand(0.5, 0.9), 7, 5), this.M.bush);
+      const b = new THREE.Mesh(geoSph(rand(0.5, 0.9), 7, 5), this.M.bush);
       b.position.set(x, 0.4, z); b.scale.y = 0.7; b.castShadow = true;
       this.scene.add(b);
     }
@@ -864,7 +866,7 @@ export class World {
       const tex = this.houseTexs[i % this.houseTexs.length];
       const wall = new THREE.MeshLambertMaterial({ map: tex });
       this.box(w, h, d, wall, x, h / 2, z, { collider: true });
-      const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.72, 2.4, 4), this.M.roof);
+      const roof = new THREE.Mesh(geoCone(Math.max(w, d) * 0.72, 2.4, 4), this.M.roof);
       roof.position.set(x, h + 1.2, z);
       roof.rotation.y = Math.PI / 4;
       roof.castShadow = true;
@@ -878,7 +880,7 @@ export class World {
     for (let i = 0; i < 10; i++) {
       const a = (i / 10) * Math.PI * 2;
       const r = 178 + rand(0, 30);
-      const hill = new THREE.Mesh(new THREE.SphereGeometry(rand(30, 48), 10, 7), this.M.hill);
+      const hill = new THREE.Mesh(geoSph(rand(30, 48), 10, 7), this.M.hill);
       hill.position.set(Math.cos(a) * r, -6, Math.sin(a) * r);
       hill.scale.y = 0.35;
       this.scene.add(hill);
@@ -914,20 +916,20 @@ export class World {
       [-39, 16], [33, -27], [-20, 30], [60, 30],
     ];
     canPos.forEach(([x, z], i) => {
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.26, 8), this.M.can);
+      const m = new THREE.Mesh(geoCyl(0.09, 0.09, 0.26, 8), this.M.can);
       this._mkPickup('can' + i, 'can', m, x, 0.35, z, 'برداشتن قوطی');
     });
     // کتاب‌های کلاس A (۳ عدد روی قفسه)
     const bookMats = [this.M.bookR, this.M.bookB, this.M.bookG];
     [[-28.8, -29.2], [-28.8, -28], [-28.8, -26.8]].forEach(([x, z], i) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.5, 0.14), bookMats[i]);
+      const m = new THREE.Mesh(geoBox(0.35, 0.5, 0.14), bookMats[i]);
       this._mkPickup('book' + i, 'book', m, x, 1.45, z, 'برداشتن کتاب');
     });
     // کوله‌پشتی گمشده پشت سالن
     const bag = new THREE.Group();
-    const bb = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.7, 0.35), this.M.bag);
+    const bb = new THREE.Mesh(geoBox(0.55, 0.7, 0.35), this.M.bag);
     bb.castShadow = true; bag.add(bb);
-    const pocket = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.35, 0.12), this.M.woodDark);
+    const pocket = new THREE.Mesh(geoBox(0.4, 0.35, 0.12), this.M.woodDark);
     pocket.position.set(0, -0.1, 0.22); bag.add(pocket);
     this._mkPickup('bag0', 'bag', bag, -62, 0.5, 17, 'برداشتن کوله‌پشتی');
 
@@ -936,7 +938,7 @@ export class World {
       [3, 30], [-8, 20], [16, -8], [26, 10], [40, 30],
       [52, 16], [-30, 34], [-20, -30.5], [12, -40], [60, 50],
     ];
-    const coinGeo = new THREE.TorusGeometry(0.24, 0.1, 8, 14);
+    const coinGeo = geoTorus(0.24, 0.1, 8, 14);
     coinPos.forEach(([x, z], i) => {
       const m = new THREE.Mesh(coinGeo, this.M.coin);
       m.position.set(x, 0.7, z);
@@ -947,7 +949,7 @@ export class World {
 
     // گنبد آسمان + خورشید + ماه
     this.skyDome = new THREE.Mesh(
-      new THREE.SphereGeometry(380, 20, 12),
+      geoSph(380, 20, 12),
       new THREE.MeshBasicMaterial({ color: 0x8ec9ee, side: THREE.BackSide, fog: false, depthWrite: false })
     );
     this.skyDome.renderOrder = -10;
@@ -978,7 +980,7 @@ export class World {
       const g = new THREE.Group();
       const puffs = randInt(2, 3);
       for (let k = 0; k < puffs; k++) {
-        const s = new THREE.Mesh(new THREE.SphereGeometry(rand(2.5, 4.5), 8, 6), this.M.cloud);
+        const s = new THREE.Mesh(geoSph(rand(2.5, 4.5), 8, 6), this.M.cloud);
         s.position.set(k * rand(3, 4.5), rand(-0.5, 0.8), rand(-1.5, 1.5));
         s.scale.y = 0.55;
         g.add(s);

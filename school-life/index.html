@@ -41,6 +41,20 @@
   </div>
 </div>
 
+<!-- ===== خطای زمان اجرا (باگ) ===== -->
+<div id="crash-error" class="overlay hidden">
+  <div class="panel small">
+    <h2>مشکلی در اجرای بازی پیش آمد</h2>
+    <p id="crash-msg">—</p>
+    <pre id="crash-detail" class="crash-detail"></pre>
+    <p class="tip">اگر این پیام را دیدی، همین متن را برای ما بفرست تا سریع درست شود. معمولاً رفرش کردن مشکل را حل می‌کند.</p>
+    <div class="crash-btns">
+      <button id="crash-reload" class="btn primary">بارگذاری دوباره</button>
+      <button id="crash-close" class="btn">بستن و ادامه</button>
+    </div>
+  </div>
+</div>
+
 <div id="webgl-error" class="overlay hidden">
   <div class="panel small">
     <h2>WebGL در دسترس نیست</h2>
@@ -381,8 +395,17 @@
     setTimeout(function () {
       var started = (typeof window !== 'undefined') && window.__game;
       if (started || _failed) return;
-      msg('هنوز در حال بارگذاری... اگر اینترنت کند است کمی صبر کن، در غیر این صورت یکی از منابع دیگر را امتحان کن.');
-      fail('بارگذاری کند یا ناتمام ماند. یک منبع دیگر را دستی امتحان کن یا صفحه را دوباره بارگذاری کن:');
+      // موتور دانلود شده و ساخت بازی شروع شده؟ پس فقط کند است، پنل خطا نشان نده
+      if (window.__slocSetLoad) {
+        msg('ساخت دنیای بازی در جریان است... چند لحظه صبر کن (بار اول کمی طول می‌کشد).');
+        return;
+      }
+      // ۴۵ ثانیه بیشتر صبر کن؛ اگر باز هم موتور نیامد، منبع بعدی
+      setTimeout(function () {
+        if (window.__game || window.__slocSetLoad || _failed) return;
+        msg('هنوز در حال بارگذاری... اگر اینترنت کند است کمی صبر کن، در غیر این صورت یکی از منابع دیگر را امتحان کن.');
+        fail('بارگذاری کند یا ناتمام ماند. یک منبع دیگر را دستی امتحان کن یا صفحه را دوباره بارگذاری کن:');
+      }, 20000);
     }, 25000);
 
     // خطای شبکه/لود ماژول سه‌بعدی را بگیر و منبع بعدی را امتحان کن
@@ -395,6 +418,59 @@
       else if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('error', onErr, true);
     } catch (e) { /* ignore */ }
   }
+
+  /* ---------- نگهبان صفحهٔ لودینگ: تشخیص گیر کردن ---------- */
+  var lastMsg = '', lastChange = Date.now(), stuckShown = false;
+  function watchdog() {
+    var el = document.getElementById('load-msg');
+    var loading = document.getElementById('loading');
+    if (!el || !loading || loading.classList.contains('hidden')) { stuckShown = false; return; }
+    var txt = el.getAttribute('data-base') || el.textContent || '';
+    var cur = (window.__loadStage || 0) + '|' + txt;
+    if (cur !== lastMsg) { lastMsg = cur; lastChange = Date.now(); stuckShown = false; return; }
+    var waited = Math.round((Date.now() - lastChange) / 1000);
+    if (!stuckShown && waited >= 12) {
+      stuckShown = true;
+      el.textContent = txt + ' — این مرحله طول کشیده (' + waited + ' ثانیه). صبر کن؛ اگر بیشتر از ۴۵ ثانیه ماند، صفحه را دوباره بارگذاری کن.';
+    }
+  }
+  setInterval(watchdog, 1500);
+
+  /* ---------- نمایش خطای زمان اجرا در پنل ---------- */
+  function showCrash(msg, detail) {
+    try {
+      var box = document.getElementById('crash-error');
+      if (!box) return;
+      var loading = document.getElementById('loading');
+      if (loading) loading.classList.add('hidden');
+      var m = document.getElementById('crash-msg');
+      if (m) m.textContent = msg || 'خطای نامشخص';
+      var d = document.getElementById('crash-detail');
+      if (d) d.textContent = (detail || '').slice(0, 900);
+      box.classList.remove('hidden');
+    } catch (e) { /* ignore */ }
+  }
+  window.__slocCrash = showCrash;
+  window.addEventListener('error', function (ev) {
+    var t = ev && ev.target;
+    if (t && t.tagName === 'SCRIPT') return;            // خطای دانلود موتور → مسیر خودش
+    if (!window.__slocSetLoad) return;                  // پیش از شروع بازی پیام نده
+    showCrash('خطای اجرا: ' + ((ev && ev.message) || 'نامشخص'),
+      ((ev && ev.filename) || '') + ':' + ((ev && ev.lineno) || 0) + '\n' + ((ev && ev.error && ev.error.stack) || ''));
+  });
+  window.addEventListener('unhandledrejection', function (ev) {
+    if (!window.__slocSetLoad) return;
+    var r = ev && ev.reason;
+    showCrash('خطای اجرای ناموفق: ' + ((r && r.message) || r || 'نامشخص'), (r && r.stack) || '');
+  });
+
+  var crashClose = document.getElementById('crash-close');
+  if (crashClose) crashClose.addEventListener('click', function () {
+    var box = document.getElementById('crash-error');
+    if (box) box.classList.add('hidden');
+  });
+  var crashReload = document.getElementById('crash-reload');
+  if (crashReload) crashReload.addEventListener('click', function () { location.reload(); });
 
   var retry = document.getElementById('boot-retry');
   if (retry) retry.addEventListener('click', function () { writeStage(0); location.reload(); });

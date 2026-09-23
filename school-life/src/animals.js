@@ -5,38 +5,38 @@
    ============================================================ */
 import * as THREE from 'three';
 import { rand, randInt, choice, clamp, dist2D, inRect, lerpAngle } from './utils.js';
-import { textSprite } from './gfx.js';
+import { geoBox, geoCone, geoCyl, geoSph, geoWingShifted, matLambert, textSprite } from './gfx.js';
 
 /* ---------- ساخت مدل‌های Low-Poly ---------- */
 function parts(mat) {
-  return (c) => new THREE.MeshLambertMaterial({ color: c });
+  return matLambert;
 }
 
 function buildCat() {
   const g = new THREE.Group();
   const M = parts();
   const fur = M(0xe8933f), furDark = M(0xc46f26), white = M(0xf7f1e6);
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.22, 0.62, 10), fur);
+  const body = new THREE.Mesh(geoCyl(0.19, 0.22, 0.62, 10), fur);
   body.rotation.z = Math.PI / 2;
   body.position.y = 0.26; body.castShadow = true; g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.19, 10, 8), fur);
+  const head = new THREE.Mesh(geoSph(0.19, 10, 8), fur);
   head.position.set(0.38, 0.36, 0); head.castShadow = true; g.add(head);
   for (const sz of [-0.09, 0.09]) {
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.16, 4), furDark);
+    const ear = new THREE.Mesh(geoCone(0.08, 0.16, 4), furDark);
     ear.position.set(0.4, 0.52, sz); g.add(ear);
   }
-  const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.035, 0.55, 6), furDark);
+  const tail = new THREE.Mesh(geoCyl(0.045, 0.035, 0.55, 6), furDark);
   tail.position.set(-0.36, 0.42, 0);
   tail.rotation.z = -0.9;
   g.add(tail);
-  const belly = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.1, 0.2), white);
+  const belly = new THREE.Mesh(geoBox(0.34, 0.1, 0.2), white);
   belly.position.y = 0.14; g.add(belly);
-  const legGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.22, 6);
+  const legGeo = geoCyl(0.05, 0.05, 0.22, 6);
   for (const [lx, lz] of [[0.24, 0.11], [0.24, -0.11], [-0.24, 0.11], [-0.24, -0.11]]) {
     const leg = new THREE.Mesh(legGeo, fur);
     leg.position.set(lx, 0.12, lz); g.add(leg);
   }
-  const eyeGeo = new THREE.SphereGeometry(0.028, 6, 5);
+  const eyeGeo = geoSph(0.028, 6, 5);
   const eyeMat = M(0x2b2b2b);
   for (const sz of [-0.07, 0.07]) {
     const eye = new THREE.Mesh(eyeGeo, eyeMat);
@@ -44,7 +44,7 @@ function buildCat() {
   }
   const whisk = M(0xf0e6d8);
   for (const sz of [-1, 1]) {
-    const w = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.01, 0.01), whisk);
+    const w = new THREE.Mesh(geoBox(0.2, 0.01, 0.01), whisk);
     w.position.set(0.52, 0.34, sz * 0.06); g.add(w);
   }
   g.userData.parts = { head, tail, body };
@@ -55,22 +55,22 @@ function buildDog() {
   const g = new THREE.Group();
   const M = parts();
   const fur = M(0xb98a52), dark = M(0x8b6236);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.4, 0.42), fur);
+  const body = new THREE.Mesh(geoBox(0.78, 0.4, 0.42), fur);
   body.position.y = 0.5; body.castShadow = true; g.add(body);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.32, 0.32), fur);
+  const head = new THREE.Mesh(geoBox(0.34, 0.32, 0.32), fur);
   head.position.set(0.5, 0.62, 0); head.castShadow = true; g.add(head);
-  const snout = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.16, 0.18), dark);
+  const snout = new THREE.Mesh(geoBox(0.2, 0.16, 0.18), dark);
   snout.position.set(0.68, 0.56, 0); g.add(snout);
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.1), dark);
+  const tail = new THREE.Mesh(geoBox(0.1, 0.3, 0.1), dark);
   tail.position.set(-0.44, 0.72, 0);
   tail.rotation.z = 0.5;
   g.add(tail);
   for (const [lx, lz] of [[0.3, 0.14], [0.3, -0.14], [-0.3, 0.14], [-0.3, -0.14]]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.34, 0.12), dark);
+    const leg = new THREE.Mesh(geoBox(0.12, 0.34, 0.12), dark);
     leg.position.set(lx, 0.17, lz); g.add(leg);
   }
   for (const sz of [-0.1, 0.1]) {
-    const ear = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.18, 0.1), dark);
+    const ear = new THREE.Mesh(geoBox(0.08, 0.18, 0.1), dark);
     ear.position.set(0.44, 0.82, sz); g.add(ear);
   }
   g.userData.parts = { head, tail };
@@ -81,18 +81,18 @@ function buildPigeon() {
   const g = new THREE.Group();
   const M = parts();
   const grey = M(0x9aa3ad), light = M(0xc7cdd4), beak = M(0xe9a13b);
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 7), grey);
+  const body = new THREE.Mesh(geoSph(0.17, 8, 7), grey);
   body.scale.set(1.2, 1, 0.9);
   body.position.y = 0.2; body.castShadow = true; g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), light);
+  const head = new THREE.Mesh(geoSph(0.1, 8, 6), light);
   head.position.set(0.16, 0.33, 0); g.add(head);
-  const bk = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.12, 5), beak);
+  const bk = new THREE.Mesh(geoCone(0.045, 0.12, 5), beak);
   bk.rotation.z = -Math.PI / 2;
   bk.position.set(0.27, 0.32, 0); g.add(bk);
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.04, 0.14), light);
+  const tail = new THREE.Mesh(geoBox(0.2, 0.04, 0.14), light);
   tail.position.set(-0.22, 0.22, 0); g.add(tail);
   for (const sz of [-0.07, 0.07]) {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.12, 5), beak);
+    const leg = new THREE.Mesh(geoCyl(0.02, 0.02, 0.12, 5), beak);
     leg.position.set(0.02, 0.06, sz); g.add(leg);
   }
   return g;
@@ -101,20 +101,19 @@ function buildPigeon() {
 function buildBird(color) {
   const g = new THREE.Group();
   const M = parts();
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), M(color));
+  const body = new THREE.Mesh(geoSph(0.16, 8, 6), M(color));
   body.scale.set(1.3, 0.9, 0.7);
   g.add(body);
-  const wingGeo = new THREE.BoxGeometry(0.42, 0.03, 0.2);
-  wingGeo.translate(0.2, 0, 0);
+  const wingGeo = geoWingShifted(0.42, 0.03, 0.2, 0.2);
   const wingL = new THREE.Mesh(wingGeo, M(color));
   wingL.position.set(0.02, 0.04, 0.1);
   const wingR = new THREE.Mesh(wingGeo, M(color));
   wingR.position.set(0.02, 0.04, -0.1);
   wingR.rotation.y = Math.PI;
   g.add(wingL); g.add(wingR);
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.02, 0.12), M(color));
+  const tail = new THREE.Mesh(geoBox(0.2, 0.02, 0.12), M(color));
   tail.position.set(-0.24, 0, 0); g.add(tail);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.09, 7, 6), M(color));
+  const head = new THREE.Mesh(geoSph(0.09, 7, 6), M(color));
   head.position.set(0.2, 0.06, 0); g.add(head);
   g.userData.parts = { wingL, wingR };
   return g;
@@ -123,13 +122,13 @@ function buildBird(color) {
 function buildButterfly(color) {
   const g = new THREE.Group();
   const M = parts();
-  const wingGeo = new THREE.BoxGeometry(0.18, 0.01, 0.26);
+  const wingGeo = geoBox(0.18, 0.01, 0.26);
   wingGeo.translate(0.09, 0, 0);
   const wl = new THREE.Mesh(wingGeo, M(color));
   const wr = new THREE.Mesh(wingGeo, M(color));
   wr.rotation.y = Math.PI;
   g.add(wl); g.add(wr);
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16, 5), M(0x30302e));
+  const body = new THREE.Mesh(geoCyl(0.02, 0.02, 0.16, 5), M(0x30302e));
   body.rotation.z = Math.PI / 2;
   g.add(body);
   g.userData.parts = { wl, wr };
@@ -140,14 +139,14 @@ function buildButterfly(color) {
 function buildFish(color) {
   const g = new THREE.Group();
   const M = parts();
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.14, 7, 6), M(color));
+  const body = new THREE.Mesh(geoSph(0.14, 7, 6), M(color));
   body.scale.set(1.6, 0.9, 0.6);
   g.add(body);
-  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.16, 5), M(color));
+  const tail = new THREE.Mesh(geoCone(0.1, 0.16, 5), M(color));
   tail.rotation.z = Math.PI / 2;
   tail.position.set(-0.24, 0, 0);
   g.add(tail);
-  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.025, 5, 4), M(0x1a1a1a));
+  const eye = new THREE.Mesh(geoSph(0.025, 5, 4), M(0x1a1a1a));
   eye.position.set(0.14, 0.05, 0.06); g.add(eye);
   return g;
 }
@@ -156,18 +155,18 @@ function buildRabbit() {
   const g = new THREE.Group();
   const M = parts();
   const fur = M(0xd8d2c6), dark = M(0xb0a898);
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), fur);
+  const body = new THREE.Mesh(geoSph(0.2, 8, 6), fur);
   body.scale.set(1.2, 0.9, 0.9);
   body.position.y = 0.2; body.castShadow = true; g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), fur);
+  const head = new THREE.Mesh(geoSph(0.13, 8, 6), fur);
   head.position.set(0.22, 0.34, 0); g.add(head);
   for (const sz of [-0.06, 0.06]) {
-    const ear = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.26, 0.08), dark);
+    const ear = new THREE.Mesh(geoBox(0.05, 0.26, 0.08), dark);
     ear.position.set(0.2, 0.52, sz);
     ear.rotation.x = sz > 0 ? 0.2 : -0.2;
     g.add(ear);
   }
-  const tail = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), M(0xf5f2ec));
+  const tail = new THREE.Mesh(geoSph(0.07, 6, 5), M(0xf5f2ec));
   tail.position.set(-0.22, 0.24, 0); g.add(tail);
   g.userData.parts = { head };
   return g;
@@ -176,19 +175,19 @@ function buildRabbit() {
 function buildKite() {
   const g = new THREE.Group();
   const M = parts();
-  const face = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.01, 0.9), M(0xe0563f));
+  const face = new THREE.Mesh(geoBox(0.9, 0.01, 0.9), M(0xe0563f));
   face.rotation.y = Math.PI / 4;
   face.castShadow = true;
   g.add(face);
-  const rib = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.02, 0.05), M(0xf7f1e6));
+  const rib = new THREE.Mesh(geoBox(1.25, 0.02, 0.05), M(0xf7f1e6));
   rib.rotation.y = Math.PI / 4;
   g.add(rib);
-  const rib2 = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.02, 0.05), M(0xf7f1e6));
+  const rib2 = new THREE.Mesh(geoBox(1.25, 0.02, 0.05), M(0xf7f1e6));
   rib2.rotation.y = -Math.PI / 4;
   g.add(rib2);
   const tail = new THREE.Group();
   for (let i = 0; i < 5; i++) {
-    const seg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.01, 0.12), M(i % 2 ? 0xffd23f : 0x4dd4ff));
+    const seg = new THREE.Mesh(geoBox(0.12, 0.01, 0.12), M(i % 2 ? 0xffd23f : 0x4dd4ff));
     seg.position.set(0, 0, i * 0.3);
     seg.rotation.y = i * 0.4;
     tail.add(seg);

@@ -5,6 +5,7 @@
    آب‌نماها، آدم‌برفی و تأثیر روی NPCها و موسیقی.
    ============================================================ */
 import * as THREE from 'three';
+import { geoBox, geoCone, geoCyl, geoSph } from './gfx.js';
 import { clamp, rand, dist2D } from './utils.js';
 
 export const WEATHER_MODES = ['auto', 'clear', 'cloudy', 'rain', 'storm', 'snow', 'fog'];
@@ -150,7 +151,7 @@ export class Weather {
     ];
     this.puddles = [];
     for (const [x, z] of spots) {
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(rand(1.1, 2.4), rand(1.1, 2.4), 0.03, 12), puddleMat);
+      const m = new THREE.Mesh(geoCyl(rand(1.1, 2.4), rand(1.1, 2.4), 0.03, 12), puddleMat);
       m.position.set(x, 0.035, z);
       m.receiveShadow = true;
       m.visible = false;
@@ -160,20 +161,20 @@ export class Weather {
     // آدم‌برفی (فقط وقتی برف می‌بارد)
     const g = new THREE.Group();
     const snowMat = new THREE.MeshLambertMaterial({ color: 0xf5f9ff });
-    const b1 = new THREE.Mesh(new THREE.SphereGeometry(0.75, 10, 8), snowMat);
+    const b1 = new THREE.Mesh(geoSph(0.75, 10, 8), snowMat);
     b1.position.y = 0.72; b1.castShadow = true; g.add(b1);
-    const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8), snowMat);
+    const b2 = new THREE.Mesh(geoSph(0.55, 10, 8), snowMat);
     b2.position.y = 1.65; b2.castShadow = true; g.add(b2);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 10, 8), snowMat);
+    const head = new THREE.Mesh(geoSph(0.38, 10, 8), snowMat);
     head.position.y = 2.35; head.castShadow = true; g.add(head);
-    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.6, 8), new THREE.MeshLambertMaterial({ color: 0x2f3a4a }));
+    const hat = new THREE.Mesh(geoCone(0.42, 0.6, 8), new THREE.MeshLambertMaterial({ color: 0x2f3a4a }));
     hat.position.y = 2.85; g.add(hat);
-    const scarf = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.16, 0.6), new THREE.MeshLambertMaterial({ color: 0xe0563f }));
+    const scarf = new THREE.Mesh(geoBox(0.6, 0.16, 0.6), new THREE.MeshLambertMaterial({ color: 0xe0563f }));
     scarf.position.y = 2.02; g.add(scarf);
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.34, 6), new THREE.MeshLambertMaterial({ color: 0xf08c2e }));
+    const nose = new THREE.Mesh(geoCone(0.08, 0.34, 6), new THREE.MeshLambertMaterial({ color: 0xf08c2e }));
     nose.position.set(0, 2.35, 0.34); nose.rotation.x = Math.PI / 2; g.add(nose);
     for (const sx of [-0.16, 0.16]) {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5), new THREE.MeshLambertMaterial({ color: 0x20242a }));
+      const eye = new THREE.Mesh(geoSph(0.05, 6, 5), new THREE.MeshLambertMaterial({ color: 0x20242a }));
       eye.position.set(sx, 2.47, 0.3); g.add(eye);
     }
     g.position.set(-8, 0, 30);

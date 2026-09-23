@@ -4,7 +4,7 @@
    سالن غذاخوری، پارک اسکیت و پیست مسابقه — همه procedural
    ============================================================ */
 import * as THREE from 'three';
-import { canvasTexture, textSprite } from './gfx.js';
+import { canvasTexture, geoBox, geoCone, geoCyl, geoPlane, geoSph, geoTorus, matLambert, textSprite } from './gfx.js';
 import { makeTextureSet } from './textures.js';
 import { rand, randInt, choice, clamp, dist2D, inRect, lerp, lerpAngle } from './utils.js';
 
@@ -85,7 +85,7 @@ export async function buildExtension(world, onStep, hooks) {
   world.mapPaths = world.mapPaths || [];
 
   /* ---------- متریال‌های مشترک این بسته ---------- */
-  const L = (c, o = {}) => new THREE.MeshLambertMaterial({ color: c, ...o });
+  const L = matLambert;
   const M = {
     sidewalk: new THREE.MeshLambertMaterial({ map: T.sidewalk }),
     gravel: new THREE.MeshLambertMaterial({ map: T.gravel }),
@@ -161,9 +161,9 @@ export async function buildExtension(world, onStep, hooks) {
   function table(x, z, ry = 0) {
     const g = new THREE.Group();
     g.position.set(x, 0, z); g.rotation.y = ry;
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.08, 12), M.woodFloor ? M.white : M.white);
+    const top = new THREE.Mesh(geoCyl(0.62, 0.62, 0.08, 12), M.woodFloor ? M.white : M.white);
     top.position.y = 0.76; top.castShadow = true; g.add(top);
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 0.74, 8), M.metal);
+    const leg = new THREE.Mesh(geoCyl(0.09, 0.13, 0.74, 8), M.metal);
     leg.position.y = 0.38; g.add(leg);
     scene.add(g);
     world.addCollider(x - 0.55, z - 0.55, x + 0.55, z + 0.55);
@@ -173,12 +173,12 @@ export async function buildExtension(world, onStep, hooks) {
   function chair(x, z, ry = 0, color = 0x3b82f6) {
     const g = new THREE.Group();
     g.position.set(x, 0, z); g.rotation.y = ry;
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.07, 0.42), L(color));
+    const seat = new THREE.Mesh(geoBox(0.42, 0.07, 0.42), L(color));
     seat.position.y = 0.46; seat.castShadow = true; g.add(seat);
-    const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.45, 0.07), L(color));
+    const back = new THREE.Mesh(geoBox(0.42, 0.45, 0.07), L(color));
     back.position.set(0, 0.7, -0.2); g.add(back);
     for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.45, 0.05), M.dark);
+      const leg = new THREE.Mesh(geoBox(0.05, 0.45, 0.05), M.dark);
       leg.position.set(sx, 0.22, sz); g.add(leg);
     }
     scene.add(g);
@@ -187,7 +187,7 @@ export async function buildExtension(world, onStep, hooks) {
 
   function lampPost(x, z, opts = {}) {
     world.box(0.16, opts.h || 4.6, 0.16, M.dark, x, (opts.h || 4.6) / 2, z);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 6), M.neon);
+    const bulb = new THREE.Mesh(geoSph(0.24, 8, 6), M.neon);
     bulb.position.set(x, opts.h || 4.6, z);
     scene.add(bulb);
     world.addCollider(x - 0.2, z - 0.2, x + 0.2, z + 0.2);
@@ -203,10 +203,10 @@ export async function buildExtension(world, onStep, hooks) {
   }
 
   function tree(x, z, s = 1) {
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.28 * s, 2.4 * s, 6), M.woodFloor ? new THREE.MeshLambertMaterial({ color: 0x7a5230 }) : M.dark);
+    const trunk = new THREE.Mesh(geoCyl(0.16 * s, 0.28 * s, 2.4 * s, 6), M.woodFloor ? new THREE.MeshLambertMaterial({ color: 0x7a5230 }) : M.dark);
     trunk.position.set(x, 1.2 * s, z); trunk.castShadow = true;
     scene.add(trunk);
-    const crown = new THREE.Mesh(new THREE.SphereGeometry(1.8 * s, 8, 6), new THREE.MeshLambertMaterial({ color: choice([0x4e8c3e, 0x5fa843, 0x468031]) }));
+    const crown = new THREE.Mesh(geoSph(1.8 * s, 8, 6), new THREE.MeshLambertMaterial({ color: choice([0x4e8c3e, 0x5fa843, 0x468031]) }));
     crown.position.set(x, 3.1 * s, z); crown.castShadow = true;
     scene.add(crown);
     world.addCollider(x - 0.3 * s, z - 0.3 * s, x + 0.3 * s, z + 0.3 * s);
@@ -215,7 +215,7 @@ export async function buildExtension(world, onStep, hooks) {
   function bench(x, z, ry = 0) { world._bench(x, z, ry); }
 
   function bin(x, z) {
-    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.32, 0.9, 10), M.green);
+    const b = new THREE.Mesh(geoCyl(0.38, 0.32, 0.9, 10), M.green);
     b.position.set(x, 0.45, z); b.castShadow = true; scene.add(b);
     world.addCollider(x - 0.35, z - 0.35, x + 0.35, z + 0.35);
   }
@@ -230,10 +230,10 @@ export async function buildExtension(world, onStep, hooks) {
     const g = new THREE.Group();
     g.position.set(x, 0, z); g.rotation.y = ry;
     for (let i = 0; i < 3; i++) {
-      const board = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.06, 0.5), M.dark);
+      const board = new THREE.Mesh(geoBox(1.8, 0.06, 0.5), M.dark);
       board.position.y = 0.55 + i * 0.5; g.add(board);
       for (let k = 0; k < 5; k++) {
-        const box = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.3), L(choice([0xe0563f, 0x4aa96c, 0x3b82f6, 0xf2c94c, 0xff8fb1, 0x8b5cf6, cols])));
+        const box = new THREE.Mesh(geoBox(0.2, 0.3, 0.3), L(choice([0xe0563f, 0x4aa96c, 0x3b82f6, 0xf2c94c, 0xff8fb1, 0x8b5cf6, cols])));
         box.position.set(-0.7 + k * 0.35, 0.72 + i * 0.5, 0);
         g.add(box);
       }
@@ -245,9 +245,9 @@ export async function buildExtension(world, onStep, hooks) {
   function counter(x, z, ry = 0, w = 3.2) {
     const g = new THREE.Group();
     g.position.set(x, 0, z); g.rotation.y = ry;
-    const top = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, 0.8), M.white);
+    const top = new THREE.Mesh(geoBox(w, 0.12, 0.8), M.white);
     top.position.y = 1.05; top.castShadow = true; g.add(top);
-    const body = new THREE.Mesh(new THREE.BoxGeometry(w - 0.1, 1.0, 0.7), M.woodFloor ? M.dark : M.dark);
+    const body = new THREE.Mesh(geoBox(w - 0.1, 1.0, 0.7), M.woodFloor ? M.dark : M.dark);
     body.position.y = 0.5; g.add(body);
     scene.add(g);
     const alongX = Math.abs(Math.sin(ry)) < 0.5;
@@ -277,7 +277,7 @@ export async function buildExtension(world, onStep, hooks) {
     world.plane(9, 6, new THREE.MeshLambertMaterial({ map: T.crosswalk }), -3, 0.035, midZ);
     world.box(0.2, 4.4, 0.2, M.dark, -8.5, 2.2, midZ + 6.4);
     for (const [dy, col] of [[3.4, 0xd9433a], [2.9, 0xf2c94c], [2.4, 0x4aa96c]]) {
-      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.7 }));
+      const lamp = new THREE.Mesh(geoSph(0.16, 8, 6), new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.7 }));
       lamp.position.set(-8.5, dy, midZ + 6.4);
       scene.add(lamp);
     }
@@ -319,7 +319,7 @@ export async function buildExtension(world, onStep, hooks) {
           world.box(5.4, 1.9, 1.0, M.white, sh.x + px, 0.95, pz, { collider: true });
         }
       } else if (sh.kind === 'pizza') {
-        const oven = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 1.6, 12), M.dark);
+        const oven = new THREE.Mesh(geoCyl(1.1, 1.1, 1.6, 12), M.dark);
         oven.rotation.z = Math.PI / 2;
         oven.position.set(sh.x - 6, 1.0, z2 - 1.6);
         scene.add(oven);
@@ -332,12 +332,12 @@ export async function buildExtension(world, onStep, hooks) {
         table(sh.x - 4, z1 + 3.5); chair(sh.x - 5, z1 + 3.5, Math.PI / 2); chair(sh.x - 3, z1 + 3.5, -Math.PI / 2);
       } else if (sh.kind === 'toy') {
         for (let i = 0; i < 6; i++) {
-          const ball = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), L(choice([0xe0563f, 0x4aa96c, 0x3b82f6, 0xf2c94c])));
+          const ball = new THREE.Mesh(geoSph(0.35, 8, 6), L(choice([0xe0563f, 0x4aa96c, 0x3b82f6, 0xf2c94c])));
           ball.position.set(sh.x - 6 + (i % 3) * 1.4, 0.9 + Math.floor(i / 3) * 0.8, z2 - 1.5);
           ball.castShadow = true;
           scene.add(ball);
         }
-        const kiteProp = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.02, 1.1), M.yellow);
+        const kiteProp = new THREE.Mesh(geoBox(1.1, 0.02, 1.1), M.yellow);
         kiteProp.rotation.y = Math.PI / 4;
         kiteProp.position.set(sh.x + 4, 2.2, z2 - 1.6);
         scene.add(kiteProp);
@@ -358,7 +358,7 @@ export async function buildExtension(world, onStep, hooks) {
     shell({ x1: EXT.bikeShop.x - 9, z1: EXT.bikeShop.z - 7, x2: EXT.bikeShop.x + 9, z2: EXT.bikeShop.z + 7, h: 4.2, mat: M.brick, roof: M.roof, floor: M.concrete, door: { side: 'south', a: EXT.bikeShop.x - 1.6, b: EXT.bikeShop.x + 1.6 }, label: 'تعمیرگاه دوچرخه', mapColor: '#c9b9a4' });
     sign('🚲 تعمیرگاه دوچرخه', EXT.bikeShop.x, 3.5, EXT.bikeShop.z + 7.4, { bg: '#1f4e5f' });
     for (let i = 0; i < 3; i++) {
-      const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.07, 6, 12), M.dark);
+      const wheel = new THREE.Mesh(geoTorus(0.42, 0.07, 6, 12), M.dark);
       wheel.position.set(EXT.bikeShop.x - 5 + i * 1.1, 0.5, EXT.bikeShop.z + 4);
       wheel.rotation.y = Math.PI / 2;
       scene.add(wheel);
@@ -378,11 +378,11 @@ export async function buildExtension(world, onStep, hooks) {
     // الاکلنگ، سرسره، تاب
     const slide = new THREE.Group();
     slide.position.set((P.x1 + P.x2) / 2, 0, P.z1 + 12);
-    const slideBoard = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.12, 4.6), M.yellow);
+    const slideBoard = new THREE.Mesh(geoBox(1.2, 0.12, 4.6), M.yellow);
     slideBoard.position.set(0, 1.5, 0);
     slideBoard.rotation.x = -0.42;
     slide.add(slideBoard);
-    const ladder = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.9, 0.1), M.metal);
+    const ladder = new THREE.Mesh(geoBox(0.1, 1.9, 0.1), M.metal);
     ladder.position.set(-0.6, 0.95, -2.1); slide.add(ladder);
     const ladder2 = ladder.clone(); ladder2.position.x = 0.6; slide.add(ladder2);
     scene.add(slide);
@@ -390,15 +390,15 @@ export async function buildExtension(world, onStep, hooks) {
     const swing = new THREE.Group();
     swing.position.set((P.x1 + P.x2) / 2, 0, P.z2 - 8);
     for (const sx of [-1.6, 1.6]) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 3.0, 0.14), M.metal);
+      const post = new THREE.Mesh(geoBox(0.14, 3.0, 0.14), M.metal);
       post.position.set(sx, 1.5, 0); swing.add(post);
     }
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.12, 0.12), M.metal);
+    const bar = new THREE.Mesh(geoBox(3.6, 0.12, 0.12), M.metal);
     bar.position.y = 3.0; swing.add(bar);
     for (const sx of [-0.9, 0.9]) {
-      const rope = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.8, 0.04), M.dark);
+      const rope = new THREE.Mesh(geoBox(0.04, 1.8, 0.04), M.dark);
       rope.position.set(sx, 2.0, 0); swing.add(rope);
-      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.24), M.dark);
+      const seat = new THREE.Mesh(geoBox(0.5, 0.06, 0.24), M.dark);
       seat.position.set(sx, 1.1, 0); swing.add(seat);
     }
     scene.add(swing);
@@ -427,7 +427,7 @@ export async function buildExtension(world, onStep, hooks) {
     interact('atm', 34, midZ - 6.8, 'برداشت روزانهٔ ۲۰ سکه', () => ext.hooks.atm && ext.hooks.atm(), 2.4);
     // سطل بازیافت با مینی‌مأموریت
     for (const [x, z] of [[-14, midZ - 6.6], [46, midZ + 7], [-30, midZ + 7]]) {
-      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.36, 1.0, 10), M.blue);
+      const b = new THREE.Mesh(geoCyl(0.42, 0.36, 1.0, 10), M.blue);
       b.position.set(x, 0.5, z); b.castShadow = true; scene.add(b);
       world.addCollider(x - 0.4, z - 0.4, x + 0.4, z + 0.4);
       interact('recycle_' + x, x, z, 'جدا کردن زباله‌های بازیافتی', () => ext.hooks.recycle && ext.hooks.recycle(), 2.2);
@@ -508,10 +508,10 @@ export async function buildExtension(world, onStep, hooks) {
     // حلقه‌های پرواز برای مأموریت
     const hoopSpots = [[86, 63, 2.6], [98, 80.5, 2.9], [94, 72, 2.4]];
     hoopSpots.forEach(([x, y, z], i) => {
-      const h = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.14, 8, 20), M.neonPink);
+      const h = new THREE.Mesh(geoTorus(1.5, 0.14, 8, 20), M.neonPink);
       h.position.set(x, y, z);
       scene.add(h);
-      const glow = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.28, 8, 20), new THREE.MeshBasicMaterial({ color: 0xff5fa2, transparent: true, opacity: 0.22 }));
+      const glow = new THREE.Mesh(geoTorus(1.5, 0.28, 8, 20), new THREE.MeshBasicMaterial({ color: 0xff5fa2, transparent: true, opacity: 0.22 }));
       glow.position.copy(h.position);
       scene.add(glow);
       ext.hoops.push({ i, x, y, z, mesh: h, taken: false });
@@ -541,11 +541,11 @@ export async function buildExtension(world, onStep, hooks) {
     // حوضچه: لبه، دیواره داخلی، کف و آب
     world.box(W.x2 - W.x1 + 2.0, 0.34, W.z2 - W.z1 + 2.0, M.poolDeck, (W.x1 + W.x2) / 2, 0.17, (W.z1 + W.z2) / 2);
     world.box(W.x2 - W.x1, 0.3, W.z2 - W.z1, new THREE.MeshLambertMaterial({ map: T.poolTile }), (W.x1 + W.x2) / 2, 0.36, (W.z1 + W.z2) / 2, { cast: false });
-    const waterMesh = new THREE.Mesh(new THREE.PlaneGeometry(W.x2 - W.x1, W.z2 - W.z1), M.water);
+    const waterMesh = new THREE.Mesh(geoPlane(W.x2 - W.x1, W.z2 - W.z1), M.water);
     waterMesh.rotation.x = -Math.PI / 2;
     waterMesh.position.set((W.x1 + W.x2) / 2, 0.46, (W.z1 + W.z2) / 2);
     scene.add(waterMesh);
-    const underwater = new THREE.Mesh(new THREE.PlaneGeometry(W.x2 - W.x1, W.z2 - W.z1), M.waterDeep);
+    const underwater = new THREE.Mesh(geoPlane(W.x2 - W.x1, W.z2 - W.z1), M.waterDeep);
     underwater.rotation.x = -Math.PI / 2;
     underwater.position.set((W.x1 + W.x2) / 2, 0.06, (W.z1 + W.z2) / 2);
     scene.add(underwater);
@@ -553,7 +553,7 @@ export async function buildExtension(world, onStep, hooks) {
     for (let lane = 1; lane <= 2; lane++) {
       const z = W.z1 + (lane * (W.z2 - W.z1)) / 3;
       for (let x = W.x1 + 1; x < W.x2 - 1; x += 1.2) {
-        const f = new THREE.Mesh(new THREE.SphereGeometry(0.12, 7, 6), lane === 1 ? M.red : M.yellow);
+        const f = new THREE.Mesh(geoSph(0.12, 7, 6), lane === 1 ? M.red : M.yellow);
         f.position.set(x, 0.52, z);
         scene.add(f);
       }
@@ -563,7 +563,7 @@ export async function buildExtension(world, onStep, hooks) {
       world.box(1.4, 0.55, 1.0, M.white, W.x2 - 2, 0.72, z);
       world.box(1.4, 0.1, 1.0, M.red, W.x2 - 2, 1.03, z, { cast: false });
     }
-    const board = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.16, 1.1), M.yellow);
+    const board = new THREE.Mesh(geoBox(3.0, 0.16, 1.1), M.yellow);
     board.position.set(W.x1 + 2.4, 3.2, W.z1 + 8);
     scene.add(board);
     world.box(0.3, 3.2, 0.3, M.metal, W.x1 + 2.4, 1.6, W.z1 + 8, { collider: true });
@@ -571,13 +571,13 @@ export async function buildExtension(world, onStep, hooks) {
     for (const z of [W.z1 + 3, W.z1 + 13]) {
       const rung = [];
       for (let i = 0; i < 3; i++) {
-        const r = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.07, 0.07), M.metal);
+        const r = new THREE.Mesh(geoBox(0.6, 0.07, 0.07), M.metal);
         r.position.set(W.x2 - 0.6, 0.5 - i * 0.25, z);
         scene.add(r);
         rung.push(r);
       }
     }
-    const buoy = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.13, 8, 16), M.red);
+    const buoy = new THREE.Mesh(geoTorus(0.5, 0.13, 8, 16), M.red);
     buoy.position.set(W.x2 + 2, 1.6, W.z1 + 2);
     scene.add(buoy);
     // رختکن، کمدها، دوش، نیمکت‌ها
@@ -587,7 +587,7 @@ export async function buildExtension(world, onStep, hooks) {
     for (let i = 0; i < 3; i++) bench(P.x1 + 4 + i * 4, P.z2 - 1.6, Math.PI);
     for (const [x, z] of [[P.x2 - 4, P.z2 - 3], [P.x2 - 4, P.z2 - 6]]) {
       world.box(0.12, 2.2, 0.12, M.metal, x, 1.1, z);
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), M.metal);
+      const head = new THREE.Mesh(geoSph(0.16, 8, 6), M.metal);
       head.position.set(x, 2.2, z); scene.add(head);
     }
     // جایگاه تماشاگران
@@ -608,7 +608,7 @@ export async function buildExtension(world, onStep, hooks) {
     const ringPos = [[W.x1 + 4, W.z1 + 3], [W.x1 + 10, W.z1 + 13], [W.x2 - 6, W.z1 + 4], [W.x2 - 10, W.z2 - 3], [(W.x1 + W.x2) / 2, W.z1 + 8]];
     ext.pool = { rect: { x1: P.x1, z1: P.z1, x2: P.x2, z2: P.z2 }, waterRect: W, waterY: 0.46, rings: [], board: { x: W.x1 + 2.4, z: W.z1 + 8, y: 3.2 } };
     ringPos.forEach(([x, z], i) => {
-      const r = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.1, 8, 18), M.yellow);
+      const r = new THREE.Mesh(geoTorus(0.55, 0.1, 8, 18), M.yellow);
       r.rotation.x = Math.PI / 2;
       r.position.set(x, 0.55, z);
       scene.add(r);
@@ -633,21 +633,21 @@ export async function buildExtension(world, onStep, hooks) {
     for (const [px, pz] of [[37.5, -14.5], [46.5, -14.5], [37.5, -8.5], [46.5, -8.5]]) {
       world.box(3.4, 0.9, 1.3, M.white, px, 0.45, pz, { collider: true });
       world.box(3.6, 0.08, 1.5, M.marble, px, 0.94, pz);
-      const sink = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.5), M.metal);
+      const sink = new THREE.Mesh(geoBox(0.6, 0.1, 0.5), M.metal);
       sink.position.set(px + 1.2, 0.96, pz);
       scene.add(sink);
-      const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.4, 6), M.metal);
+      const tap = new THREE.Mesh(geoCyl(0.05, 0.05, 0.4, 6), M.metal);
       tap.position.set(px + 1.2, 1.16, pz); scene.add(tap);
       for (let i = 0; i < 3; i++) {
-        const flask = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.3, 8), new THREE.MeshLambertMaterial({ color: 0xcfe8f5, transparent: true, opacity: 0.7 }));
+        const flask = new THREE.Mesh(geoCyl(0.11, 0.14, 0.3, 8), new THREE.MeshLambertMaterial({ color: 0xcfe8f5, transparent: true, opacity: 0.7 }));
         flask.position.set(px - 1 + i * 0.5, 1.13, pz + 0.2);
         scene.add(flask);
-        const liq = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.14, 8), L([0x4dd4ff, 0xffd23f, 0xff6b9d][i]));
+        const liq = new THREE.Mesh(geoCyl(0.1, 0.13, 0.14, 8), L([0x4dd4ff, 0xffd23f, 0xff6b9d][i]));
         liq.position.set(px - 1 + i * 0.5, 1.06, pz + 0.2);
         scene.add(liq);
       }
       // شعلهٔ بنزن
-      const flame = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.25, 6), new THREE.MeshBasicMaterial({ color: 0x63d2ff, transparent: true, opacity: 0.8 }));
+      const flame = new THREE.Mesh(geoCone(0.09, 0.25, 6), new THREE.MeshBasicMaterial({ color: 0x63d2ff, transparent: true, opacity: 0.8 }));
       flame.position.set(px + 0.1, 1.15, pz - 0.3);
       scene.add(flame);
     }
@@ -655,7 +655,7 @@ export async function buildExtension(world, onStep, hooks) {
     world.box(2.4, 2.2, 1.2, M.concrete, 51.5, 1.1, -10, { collider: true });
     world.box(0.3, 3.0, 3.4, M.woodFloor ? M.dark : M.dark, 35.2, 1.5, -10, { collider: true });
     for (let i = 0; i < 12; i++) {
-      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.26, 8), L(choice([0x4dd4ff, 0xffd23f, 0xff6b9d, 0x7cff6b, 0xc77dff])));
+      const b = new THREE.Mesh(geoCyl(0.09, 0.09, 0.26, 8), L(choice([0x4dd4ff, 0xffd23f, 0xff6b9d, 0x7cff6b, 0xc77dff])));
       b.position.set(35.5, 0.7 + Math.floor(i / 4) * 0.6, -11.6 + (i % 4) * 0.9);
       scene.add(b);
     }
@@ -677,10 +677,10 @@ export async function buildExtension(world, onStep, hooks) {
       ctx.textAlign = 'center';
       ctx.fillText('جدول تناوبی عناصر', w / 2, h - 12);
     });
-    const board = new THREE.Mesh(new THREE.BoxGeometry(6.4, 3.0, 0.14), new THREE.MeshLambertMaterial({ map: periodic }));
+    const board = new THREE.Mesh(geoBox(6.4, 3.0, 0.14), new THREE.MeshLambertMaterial({ map: periodic }));
     board.position.set(44, 2.1, Lb.z1 + 0.2);
     scene.add(board);
-    const desk = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.1, 1.0), M.marble);
+    const desk = new THREE.Mesh(geoBox(2.2, 0.1, 1.0), M.marble);
     desk.position.set(44, 0.85, -4.2);
     scene.add(desk);
     world.box(2.1, 0.8, 0.9, M.dark, 44, 0.4, -4.2, { collider: true });
@@ -688,10 +688,10 @@ export async function buildExtension(world, onStep, hooks) {
     // میکروسکوپ
     const scope = new THREE.Group();
     scope.position.set(44, 0.9, -4.2);
-    const base = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.36), M.dark);
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1), M.metal);
+    const base = new THREE.Mesh(geoBox(0.5, 0.08, 0.36), M.dark);
+    const arm = new THREE.Mesh(geoBox(0.1, 0.5, 0.1), M.metal);
     arm.position.set(-0.14, 0.28, 0);
-    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.35, 8), M.metal);
+    const tube = new THREE.Mesh(geoCyl(0.06, 0.06, 0.35, 8), M.metal);
     tube.position.set(-0.14, 0.52, 0.06);
     scope.add(base); scope.add(arm); scope.add(tube);
     scene.add(scope);
@@ -727,13 +727,13 @@ export async function buildExtension(world, onStep, hooks) {
     const bed = (x, z, ry) => {
       const g = new THREE.Group();
       g.position.set(x, 0, z); g.rotation.y = ry;
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.35, 2.2), M.woodFloor ? M.dark : M.dark);
+      const frame = new THREE.Mesh(geoBox(1.1, 0.35, 2.2), M.woodFloor ? M.dark : M.dark);
       frame.position.y = 0.3; frame.castShadow = true; g.add(frame);
-      const matt = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.22, 2.05), M.white);
+      const matt = new THREE.Mesh(geoBox(1.0, 0.22, 2.05), M.white);
       matt.position.y = 0.55; g.add(matt);
-      const pillow = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.16, 0.45), M.blue);
+      const pillow = new THREE.Mesh(geoBox(0.7, 0.16, 0.45), M.blue);
       pillow.position.set(0, 0.72, -0.75); g.add(pillow);
-      const quilt = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.12, 1.2), L(choice([0x3b82f6, 0x4aa96c, 0xe0563f, 0x8b5cf6])));
+      const quilt = new THREE.Mesh(geoBox(1.02, 0.12, 1.2), L(choice([0x3b82f6, 0x4aa96c, 0xe0563f, 0x8b5cf6])));
       quilt.position.set(0, 0.7, 0.4); g.add(quilt);
       scene.add(g);
       world.addCollider(x - 0.6, z - 1.2, x + 0.6, z + 1.2);
@@ -767,7 +767,7 @@ export async function buildExtension(world, onStep, hooks) {
     // آشپزخانه کوچک خوابگاه
     world.box(3.0, 0.9, 1.0, M.white, D.x1 + 24, 0.45, D.z2 - 2.2, { collider: true });
     world.box(3.2, 0.08, 1.1, M.marble, D.x1 + 24, 0.94, D.z2 - 2.2);
-    const kettle = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.3, 8), M.metal);
+    const kettle = new THREE.Mesh(geoCyl(0.14, 0.16, 0.3, 8), M.metal);
     kettle.position.set(D.x1 + 24.6, 1.13, D.z2 - 2.2);
     scene.add(kettle);
     const pl = new THREE.PointLight(0xffe9bf, 22, 30, 1.8);
@@ -789,11 +789,11 @@ export async function buildExtension(world, onStep, hooks) {
     world.box(14, 1.0, 1.2, M.white, F.x1 + 8, 0.5, F.z1 + 2, { collider: true });
     world.box(14.4, 0.1, 1.3, M.marble, F.x1 + 8, 1.05, F.z1 + 2);
     for (const [px, pc] of [[F.x1 + 3, 0x9aa3ad], [F.x1 + 6, 0x8b93a0], [F.x1 + 9, 0x9aa3ad]]) {
-      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.26, 0.3, 10), L(pc));
+      const pot = new THREE.Mesh(geoCyl(0.3, 0.26, 0.3, 10), L(pc));
       pot.position.set(px, 1.25, F.z1 + 2);
       scene.add(pot);
     }
-    const fridge = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.2, 1.0), M.white);
+    const fridge = new THREE.Mesh(geoBox(1.6, 2.2, 1.0), M.white);
     fridge.position.set(F.x1 + 2, 1.1, F.z1 + 4.4);
     scene.add(fridge);
     world.addCollider(F.x1 + 1.2, F.z1 + 3.9, F.x1 + 2.8, F.z1 + 4.9);
@@ -902,7 +902,7 @@ export async function buildExtension(world, onStep, hooks) {
     }, { repeat: [1, 1] });
     const startIdx = 3;  // نزدیک مستقیم شمالی
     const sp = pts[startIdx];
-    const lineMesh = new THREE.Mesh(new THREE.PlaneGeometry(EXT.track.width, 2.4), new THREE.MeshLambertMaterial({ map: checker }));
+    const lineMesh = new THREE.Mesh(geoPlane(EXT.track.width, 2.4), new THREE.MeshLambertMaterial({ map: checker }));
     lineMesh.rotation.x = -Math.PI / 2;
     lineMesh.position.set(sp.x, 0.06, sp.z);
     scene.add(lineMesh);
@@ -925,10 +925,10 @@ export async function buildExtension(world, onStep, hooks) {
       const dir = { x: Math.sin(Math.atan2(n.x, n.z)), z: Math.cos(Math.atan2(n.x, n.z)) };
       for (const s of [-1, 1]) {
         const px = p.x + n.x * (halfW + 1.2) * s, pz = p.z + n.z * (halfW + 1.2) * s;
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 4.4, 8), M.yellow);
+        const pole = new THREE.Mesh(geoCyl(0.14, 0.14, 4.4, 8), M.yellow);
         pole.position.set(px, 2.2, pz);
         scene.add(pole);
-        const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.7), M.red);
+        const flag = new THREE.Mesh(geoPlane(1.2, 0.7), M.red);
         flag.position.set(px, 4.1, pz);
         flag.rotation.y = dir.x;
         scene.add(flag);
@@ -946,7 +946,7 @@ export async function buildExtension(world, onStep, hooks) {
     for (let i = 0; i < N; i += 14) {
       const p = pts[i], n = normals[i];
       const px = p.x + n.x * (halfW + 2.2), pz = p.z + n.z * (halfW + 2.2);
-      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.5, 10), new THREE.MeshLambertMaterial({ map: T.tire }));
+      const st = new THREE.Mesh(geoCyl(0.7, 0.7, 0.5, 10), new THREE.MeshLambertMaterial({ map: T.tire }));
       st.rotation.z = Math.PI / 2;
       st.position.set(px, 0.35, pz);
       st.castShadow = true;
@@ -961,7 +961,7 @@ export async function buildExtension(world, onStep, hooks) {
       const a = (i / 6) * Math.PI * 2;
       const x = Math.cos(a) * 74, z = -86 + Math.sin(a) * 34;
       world.box(0.24, 9, 0.24, M.dark, x, 4.5, z);
-      const head = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 1.2), M.neon);
+      const head = new THREE.Mesh(geoBox(2.2, 0.5, 1.2), M.neon);
       head.position.set(x, 9.1, z);
       scene.add(head);
       const pl = new THREE.PointLight(0xf0f6ff, 30, 44, 1.6);
@@ -975,7 +975,7 @@ export async function buildExtension(world, onStep, hooks) {
       for (let i = 0; i < rows; i++) {
         world.box(16, 0.5, 1.4, M.concrete, x, 0.25 + i * 0.5, z + i * 1.4 * (ry ? -1 : 1));
         for (let k = 0; k < 8; k++) {
-          const seat = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.2, 1.1), L([0x3b82f6, 0xe0563f, 0xf2c94c, 0x4aa96c][(k + i) % 4]));
+          const seat = new THREE.Mesh(geoBox(1.4, 0.2, 1.1), L([0x3b82f6, 0xe0563f, 0xf2c94c, 0x4aa96c][(k + i) % 4]));
           seat.position.set(x - 7 + k * 2, 0.6 + i * 0.5, z + i * 1.4 * (ry ? -1 : 1));
           scene.add(seat);
         }
@@ -989,7 +989,7 @@ export async function buildExtension(world, onStep, hooks) {
     shell({ x1: 4, z1: -74, x2: 16, z2: -66, h: 4, mat: M.concrete, roof: M.roof, floor: M.concrete, door: { side: 'north', a: 8.5, b: 11.5 }, label: 'پیت', mapColor: '#8e8e9c' });
     sign('🔧 پیت‌استاپ', 10, 3.6, -66.4, { bg: '#333a45' });
     for (let i = 0; i < 5; i++) {
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.8, 8), M.orange);
+      const cone = new THREE.Mesh(geoCone(0.28, 0.8, 8), M.orange);
       cone.position.set(18 + i * 2.4, 0.4, -72);
       cone.castShadow = true;
       scene.add(cone);
@@ -1037,7 +1037,7 @@ export async function buildExtension(world, onStep, hooks) {
     // پرچم‌های تزئینی جلوی مدرسه و پیت
     const flags = [];
     for (let i = 0; i < 8; i++) {
-      const f = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.9), new THREE.MeshLambertMaterial({ map: T.flag, side: THREE.DoubleSide }));
+      const f = new THREE.Mesh(geoPlane(1.4, 0.9), new THREE.MeshLambertMaterial({ map: T.flag, side: THREE.DoubleSide }));
       const px = -21 + i * 6;
       world.box(0.12, 5.4, 0.12, M.metal, px, 2.7, 58.5);
       f.position.set(px + 0.7, 5.0, 58.5);
@@ -1047,7 +1047,7 @@ export async function buildExtension(world, onStep, hooks) {
     ext.flags = flags;
     ext.flagT = 0;
     for (let i = 0; i < 4; i++) {
-      const f = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.0), new THREE.MeshLambertMaterial({ map: T.flag, side: THREE.DoubleSide }));
+      const f = new THREE.Mesh(geoPlane(1.6, 1.0), new THREE.MeshLambertMaterial({ map: T.flag, side: THREE.DoubleSide }));
       world.box(0.14, 7, 0.14, M.metal, 18 + i * 5, 3.5, -62);
       f.position.set(18 + i * 5 + 0.8, 6.4, -62);
       scene.add(f);

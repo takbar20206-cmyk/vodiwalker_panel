@@ -360,3 +360,13 @@ html, body {
 
 /* نشانگر اهرم‌ها در راهنما */
 .gear-tag { display: inline-block; background: rgba(255,255,255,0.1); border-radius: 8px; padding: 2px 8px; margin-inline-start: 6px; font-size: 12px; }
+
+
+/* ===== پنل خطای زمان اجرا ===== */
+.crash-detail {
+  direction: ltr; text-align: left; font-size: 11px; line-height: 1.5;
+  max-height: 180px; overflow: auto; background: #131a26; color: #b7c6dd;
+  border: 1px solid #2a3648; border-radius: 8px; padding: 8px; margin: 8px 0;
+  white-space: pre-wrap; word-break: break-word;
+}
+.crash-btns { display: flex; gap: 8px; flex-wrap: wrap; }

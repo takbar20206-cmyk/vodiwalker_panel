@@ -4,6 +4,7 @@
    دفترچهٔ داستان، گفت‌وگوها و زنجیرهٔ رویدادها
    ============================================================ */
 import * as THREE from 'three';
+import { geoBox, geoTorus } from './gfx.js';
 import { clamp, rand, dist2D, faNum, inRect } from './utils.js';
 
 export const CHAPTERS = [
@@ -367,13 +368,13 @@ export class StoryManager {
     this._keyPos = { x: -93, z: 68 };
     if (this._keyMesh) { this._keyMesh.visible = true; return; }
     const g = new THREE.Group();
-    const M = (c) => new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: 0.35 });
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.05, 8, 14), M(0xf2c94c));
+    const M = (c) => matLambert(c, { emissive: c, emissiveIntensity: 0.35 });
+    const ring = new THREE.Mesh(geoTorus(0.16, 0.05, 8, 14), M(0xf2c94c));
     g.add(ring);
-    const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.5), M(0xf2c94c));
+    const shaft = new THREE.Mesh(geoBox(0.06, 0.06, 0.5), M(0xf2c94c));
     shaft.position.z = 0.3;
     g.add(shaft);
-    const bit = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.12), M(0xf2c94c));
+    const bit = new THREE.Mesh(geoBox(0.06, 0.16, 0.12), M(0xf2c94c));
     bit.position.set(0, -0.06, 0.5);
     g.add(bit);
     g.position.set(this._keyPos.x, 0.9, this._keyPos.z);
@@ -385,7 +386,7 @@ export class StoryManager {
   _spawnLostBook() {
     this._bookPos = { x: 39.6, z: -33.4 };
     if (this._bookMesh) { this._bookMesh.visible = true; return; }
-    const bk = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.55, 0.16), new THREE.MeshLambertMaterial({ color: 0xd9433a, emissive: 0x551111, emissiveIntensity: 0.35 }));
+    const bk = new THREE.Mesh(geoBox(0.4, 0.55, 0.16), matLambert(0xd9433a, { emissive: 0x551111, emissiveIntensity: 0.35 }));
     bk.position.set(this._bookPos.x, 1.6, this._bookPos.z);
     bk.castShadow = true;
     this.ctx.world.scene.add(bk);

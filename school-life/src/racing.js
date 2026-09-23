@@ -4,7 +4,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { clamp, rand, dist2D, lerpAngle, faNum } from './utils.js';
-import { textSprite } from './gfx.js';
+import { geoBox, geoCyl, geoSph, matLambert, textSprite } from './gfx.js';
 
 export const RACE_MODES = [
   { id: 'timeTrial', name: 'تایم‌تریل',      icon: '⏱', desc: '۳ دور، فقط تو و ساعت!',        laps: 3, rivals: 0 },
@@ -21,28 +21,28 @@ const RIVALS = [
 
 function buildKart(color, num) {
   const g = new THREE.Group();
-  const M = (c) => new THREE.MeshLambertMaterial({ color: c });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.35, 2.0), M(color));
+  const M = matLambert;
+  const body = new THREE.Mesh(geoBox(1.1, 0.35, 2.0), M(color));
   body.position.y = 0.45; body.castShadow = true; g.add(body);
-  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.2, 0.6), M(0xf2f2ea));
+  const nose = new THREE.Mesh(geoBox(0.7, 0.2, 0.6), M(0xf2f2ea));
   nose.position.set(0, 0.42, 1.2); g.add(nose);
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.5), M(0x2c313a));
+  const seat = new THREE.Mesh(geoBox(0.6, 0.5, 0.5), M(0x2c313a));
   seat.position.set(0, 0.72, -0.35); g.add(seat);
-  const driver = new THREE.Mesh(new THREE.SphereGeometry(0.19, 8, 6), M(0xe8b98a));
+  const driver = new THREE.Mesh(geoSph(0.19, 8, 6), M(0xe8b98a));
   driver.position.set(0, 1.0, -0.3); g.add(driver);
   const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.21, 8, 6, 0, 6.28, 0, 1.2), M(color));
   helmet.position.set(0, 1.04, -0.3); g.add(helmet);
-  const spoiler = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.3), M(0x22242a));
+  const spoiler = new THREE.Mesh(geoBox(0.9, 0.08, 0.3), M(0x22242a));
   spoiler.position.set(0, 0.85, -1.0); g.add(spoiler);
   for (const sx of [-0.35, 0.35]) {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.25, 0.07), M(0x22242a));
+    const post = new THREE.Mesh(geoBox(0.07, 0.25, 0.07), M(0x22242a));
     post.position.set(sx, 0.7, -1.0); g.add(post);
   }
   const wheels = [];
   for (const [px, pz, steer] of [[-0.62, 0.75, true], [0.62, 0.75, true], [-0.66, -0.7, false], [0.66, -0.7, false]]) {
     const pivot = new THREE.Group();
     pivot.position.set(px, 0.26, pz);
-    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.2, 10), M(0x1d1f24));
+    const w = new THREE.Mesh(geoCyl(0.26, 0.26, 0.2, 10), M(0x1d1f24));
     w.rotation.z = Math.PI / 2;
     w.castShadow = true;
     pivot.add(w);

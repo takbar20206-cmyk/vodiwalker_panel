@@ -4,7 +4,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { rand, choice, clamp, lerpAngle, resolveCollisions, dist2D, inRect } from './utils.js';
-import { textSprite } from './gfx.js';
+import { geoBox, geoBoxShifted, geoSph, matLambert, textSprite } from './gfx.js';
 import { areaOf, AREAS, DOORS, BOUNDS } from './world.js';
 
 const SHIRTS = [0x3b82f6, 0xef4444, 0x22c55e, 0xf59e0b, 0x8b5cf6, 0xec4899, 0x14b8a6, 0xeab308, 0x6366f1];
@@ -27,30 +27,28 @@ function buildHuman(o = {}) {
   const hair = o.hair != null ? o.hair : choice(HAIRS);
   const H = o.height || 1.7;
   const s = H / 1.7;
-  const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
+  const mat = matLambert;
 
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.56 * s, 0.72 * s, 0.34 * s), mat(shirt));
+  const body = new THREE.Mesh(geoBox(0.56 * s, 0.72 * s, 0.34 * s), mat(shirt));
   body.position.y = 1.02 * s; body.castShadow = true; g.add(body);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24 * s, 10, 8), mat(skin));
+  const head = new THREE.Mesh(geoSph(0.24 * s, 10, 8), mat(skin));
   head.position.y = 1.56 * s; head.castShadow = true; g.add(head);
 
-  const hairM = new THREE.Mesh(new THREE.BoxGeometry(0.4 * s, 0.16 * s, 0.4 * s), mat(hair));
+  const hairM = new THREE.Mesh(geoBox(0.4 * s, 0.16 * s, 0.4 * s), mat(hair));
   hairM.position.y = 1.74 * s; g.add(hairM);
   if (o.longHair) {
-    const back = new THREE.Mesh(new THREE.BoxGeometry(0.36 * s, 0.4 * s, 0.12 * s), mat(hair));
+    const back = new THREE.Mesh(geoBox(0.36 * s, 0.4 * s, 0.12 * s), mat(hair));
     back.position.set(0, 1.5 * s, -0.2 * s); g.add(back);
   }
 
-  const legGeo = new THREE.BoxGeometry(0.2 * s, 0.66 * s, 0.24 * s);
-  legGeo.translate(0, -0.33 * s, 0); // چرخش از لگن
+  const legGeo = geoBoxShifted(0.2 * s, 0.66 * s, 0.24 * s, 0, -0.33 * s, 0); // چرخش از لگن
   const legL = new THREE.Mesh(legGeo, mat(pants));
   legL.position.set(-0.14 * s, 0.66 * s, 0); legL.castShadow = true; g.add(legL);
   const legR = new THREE.Mesh(legGeo, mat(pants));
   legR.position.set(0.14 * s, 0.66 * s, 0); legR.castShadow = true; g.add(legR);
 
-  const armGeo = new THREE.BoxGeometry(0.16 * s, 0.6 * s, 0.2 * s);
-  armGeo.translate(0, -0.3 * s, 0); // چرخش از شانه
+  const armGeo = geoBoxShifted(0.16 * s, 0.6 * s, 0.2 * s, 0, -0.3 * s, 0); // چرخش از شانه
   const armL = new THREE.Mesh(armGeo, mat(shirt));
   armL.position.set(-0.37 * s, 1.32 * s, 0); g.add(armL);
   const armR = new THREE.Mesh(armGeo, mat(shirt));

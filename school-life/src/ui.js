@@ -99,9 +99,28 @@ export class UI {
   /* ---------------- لودینگ و منو ---------------- */
   setLoad(pct, msg) {
     if (this.el['load-bar-fill']) this.el['load-bar-fill'].style.width = pct + '%';
-    if (this.el['load-msg'] && msg) this.el['load-msg'].textContent = msg;
+    // نگهبان لودینگ (index.html) از این دو مقدار برای تشخیص «گیر کردن» استفاده می‌کند
+    if (typeof window !== 'undefined') window.__loadStage = pct;
+    const lm = this.el['load-msg'];
+    if (lm && msg) { lm.textContent = msg; if (lm.setAttribute) lm.setAttribute('data-base', msg); }
   }
   hideLoading() { if (this.el.loading) this.el.loading.classList.add('hidden'); }
+
+  /** نمایش پنل خطای زمان اجرا (برای باگ‌گیری در دست کاربر) */
+  showCrash(msg, detail) {
+    if (typeof window !== 'undefined' && typeof window.__slocCrash === 'function') {
+      window.__slocCrash(msg, detail);
+      return;
+    }
+    const box = this.el['crash-error'] || document.getElementById('crash-error');
+    if (!box) return;
+    if (this.el.loading) this.el.loading.classList.add('hidden');
+    const m = document.getElementById('crash-msg');
+    if (m) m.textContent = msg || 'خطای نامشخص';
+    const d = document.getElementById('crash-detail');
+    if (d) d.textContent = String(detail || '').slice(0, 900);
+    box.classList.remove('hidden');
+  }
   showMenu(hasSave, saveInfo) {
     this.el['main-menu'].classList.remove('hidden');
     const bc = this.el['btn-continue'];

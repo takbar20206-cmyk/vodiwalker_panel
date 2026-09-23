@@ -28,37 +28,54 @@ export function canvasTexture(w, h, fn, opts = {}) {
  * ساخت Sprite متنی (برای نام NPCها، تابلوها، علامت‌ها).
  * متن فارسی روی Canvas به‌درستی shape می‌شود.
  */
+const _measCanvas = (typeof document !== 'undefined') ? document.createElement('canvas') : null;
+const _labelTex = new Map();   // کش تکسچر برچسب‌ها (canvas گران است)
+
 export function textSprite(text, opts = {}) {
   const fontSize = opts.size || 44;
   const font = (opts.weight || 'bold') + ' ' + fontSize + 'px ' + (opts.font || 'Vazirmatn, Tahoma, sans-serif');
   const pad = opts.pad != null ? opts.pad : 16;
-  const meas = document.createElement('canvas').getContext('2d');
-  meas.font = font;
-  const tw = Math.ceil(meas.measureText(text).width);
-  const c = document.createElement('canvas');
-  c.width = Math.max(2, tw + pad * 2);
-  c.height = fontSize + pad * 2;
-  const ctx = c.getContext('2d');
-  if (opts.bg !== null) {
-    ctx.fillStyle = opts.bg || 'rgba(10, 16, 30, 0.62)';
-    const r = opts.radius != null ? opts.radius : 18;
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(0, 0, c.width, c.height, r);
-    else ctx.rect(0, 0, c.width, c.height);
-    ctx.fill();
-    if (opts.border) {
-      ctx.strokeStyle = opts.border;
-      ctx.lineWidth = 3;
-      ctx.stroke();
+  const key = [text, font, pad, opts.bg, opts.fg, opts.border, opts.radius].join('|');
+  let cached = _labelTex.get(key);
+  let tex;
+  if (!cached) {
+    // اندازه‌گیری با یک canvas مشترک (به‌جای ساخت canvas تازه برای هر برچسب)
+    const meas = _measCanvas ? _measCanvas.getContext('2d') : null;
+    let tw = text.length * fontSize * 0.6;
+    if (meas) { meas.font = font; tw = Math.ceil(meas.measureText(text).width); }
+    const c = document.createElement('canvas');
+    c.width = Math.max(2, tw + pad * 2);
+    c.height = fontSize + pad * 2;
+    const ctx = c.getContext('2d');
+    if (opts.bg !== null) {
+      ctx.fillStyle = opts.bg || 'rgba(10, 16, 30, 0.62)';
+      const r = opts.radius != null ? opts.radius : 18;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(0, 0, c.width, c.height, r);
+      else ctx.rect(0, 0, c.width, c.height);
+      ctx.fill();
+      if (opts.border) {
+        ctx.strokeStyle = opts.border;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
     }
+    ctx.font = font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = opts.fg || '#ffffff';
+    ctx.fillText(text, c.width / 2, c.height / 2 + 2);
+    tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    // برچسب‌ها به mipmap نیاز ندارند (حافظه و زمان آپلود کم‌تر)
+    tex.generateMipmaps = false;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    _labelTex.set(key, { tex, aspect: c.width / c.height, height: fontSize + pad * 2 });
+    cached = _labelTex.get(key);
+  } else {
+    tex = cached.tex;
   }
-  ctx.font = font;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = opts.fg || '#ffffff';
-  ctx.fillText(text, c.width / 2, c.height / 2 + 2);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
   const mat = new THREE.SpriteMaterial({
     map: tex,
     transparent: true,
@@ -66,7 +83,7 @@ export function textSprite(text, opts = {}) {
   });
   const sp = new THREE.Sprite(mat);
   const worldH = opts.height || 0.55;
-  sp.scale.set(worldH * (c.width / c.height), worldH, 1);
+  sp.scale.set(worldH * cached.aspect, worldH, 1);
   sp.userData.opts = opts;
   return sp;
 }
@@ -165,3 +182,90 @@ export class SparkPool {
     }
   }
 }
+
+/* ============================================================
+   کش متریال و هندسه — «باگ‌گیری کارایی»
+   ساخت ۲۵۰۰ مِش با هندسه/متریال جداگانه، ۲۴۰۰ هندسه و ۱۴۰۰
+   متریال یکتا می‌ساخت؛ در مرورگر یعنی هزاران buffer و shader
+   که صفحهٔ لودینگ را قفل می‌کند. این کش‌ها آن‌ها را به چند صد
+   مورد کاهش می‌دهند (رندر سریع‌تر، لود سبک‌تر).
+   نکته: هندسه/متریال کش‌شده هرگز نباید پس از ساخت تغییر کند
+   (رنگ، شفافیت، map یا translate) — برای آن موارد، هندسهٔ
+   اختصاصی بساز.
+   ============================================================ */
+const MAT_CACHE = new Map();
+const GEO_CACHE = new Map();
+
+function optKey(opts) {
+  if (!opts) return '';
+  const keys = Object.keys(opts).sort();
+  let out = '';
+  for (const k of keys) {
+    const v = opts[k];
+    out += '|' + k + '=' + (v && v.isTexture ? 'tex' + (v.uuid || '?') : String(v));
+  }
+  return out;
+}
+
+/** متریال Lambert مشترک بر اساس رنگ/تنظیمات */
+export function matLambert(color, opts) {
+  const key = 'L' + color + optKey(opts);
+  let m = MAT_CACHE.get(key);
+  if (!m) { m = new THREE.MeshLambertMaterial({ color, ...(opts || {}) }); MAT_CACHE.set(key, m); }
+  return m;
+}
+
+/** متریال Basic مشترک (بدون نور) */
+export function matBasic(color, opts) {
+  const key = 'B' + color + optKey(opts);
+  let m = MAT_CACHE.get(key);
+  if (!m) { m = new THREE.MeshBasicMaterial({ color, ...(opts || {}) }); MAT_CACHE.set(key, m); }
+  return m;
+}
+
+function cached(kind, args, make) {
+  const key = kind + ':' + args.join(',');
+  let g = GEO_CACHE.get(key);
+  if (!g) { g = make(); GEO_CACHE.set(key, g); }
+  return g;
+}
+
+export function geoBox(w, h, d) { return cached('box', [w, h, d], () => new THREE.BoxGeometry(w, h, d)); }
+export function geoPlane(w, d) { return cached('plane', [w, d], () => new THREE.PlaneGeometry(w, d)); }
+export function geoCyl(rt, rb, h, seg) { return cached('cyl', [rt, rb, h, seg], () => new THREE.CylinderGeometry(rt, rb, h, seg)); }
+export function geoSph(r, ws, hs) { return cached('sph', [r, ws, hs], () => new THREE.SphereGeometry(r, ws, hs)); }
+export function geoTorus(r, tube, rs, ts) { return cached('tor', [r, tube, rs, ts], () => new THREE.TorusGeometry(r, tube, rs, ts)); }
+export function geoRing(ri, ro, seg) { return cached('ring', [ri, ro, seg], () => new THREE.RingGeometry(ri, ro, seg)); }
+export function geoCone(r, h, seg) { return cached('cone', [r, h, seg], () => new THREE.ConeGeometry(r, h, seg)); }
+
+/** هندسهٔ جابه‌جاشده (مثل بازو/پا که حول شانه/لگن می‌چرخد) */
+export function geoBoxShifted(w, h, d, tx, ty, tz) {
+  return cached('boxs', [w, h, d, tx, ty, tz], () => {
+    const g = new THREE.BoxGeometry(w, h, d);
+    g.translate(tx, ty, tz);
+    return g;
+  });
+}
+export function geoBoxRotZ(w, h, d, rz) {
+  return cached('boxz', [w, h, d, rz], () => {
+    const g = new THREE.BoxGeometry(w, h, d);
+    g.rotateZ(rz);
+    return g;
+  });
+}
+export function geoCylRotZ(rt, rb, h, seg) {
+  return cached('cylz', [rt, rb, h, seg], () => {
+    const g = new THREE.CylinderGeometry(rt, rb, h, seg);
+    g.rotateZ(Math.PI / 2);
+    return g;
+  });
+}
+export function geoWingShifted(w, h, d, tx) {
+  return cached('wing', [w, h, d, tx], () => {
+    const g = new THREE.BoxGeometry(w, h, d);
+    g.translate(tx, 0, 0);
+    return g;
+  });
+}
+
+export function cacheStats() { return { materials: MAT_CACHE.size, geometries: GEO_CACHE.size }; }

@@ -3,6 +3,7 @@
    کنترل دانش‌آموز: حرکت سوم‌شخص، دوربین، پرش، انیمیشن
    ============================================================ */
 import * as THREE from 'three';
+import { geoBox, geoCyl, geoSph, geoTorus, matLambert, geoBoxShifted } from './gfx.js';
 import { clamp, lerpAngle, resolveCollisions } from './utils.js';
 import { BOUNDS } from './world.js';
 
@@ -10,32 +11,30 @@ const WALK = 4.2, RUN = 7.2, JUMP_V = 5.4, GRAV = 16;
 
 function buildPlayer() {
   const g = new THREE.Group();
-  const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
+  const mat = matLambert;
   const shirt = 0x2f6fed, pants = 0x2b3442, skin = 0xe8b98a;
 
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.72, 0.34), mat(shirt));
+  const body = new THREE.Mesh(geoBox(0.56, 0.72, 0.34), mat(shirt));
   body.position.y = 1.02; body.castShadow = true; g.add(body);
   // کوله‌پشتی
-  const pack = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.55, 0.24), mat(0xe67e22));
+  const pack = new THREE.Mesh(geoBox(0.42, 0.55, 0.24), mat(0xe67e22));
   pack.position.set(0, 1.05, -0.28); pack.castShadow = true; g.add(pack);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), mat(skin));
+  const head = new THREE.Mesh(geoSph(0.24, 12, 10), mat(skin));
   head.position.y = 1.56; head.castShadow = true; g.add(head);
   // کلاه
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.26, 0.14, 10), mat(0xd63c3c));
+  const cap = new THREE.Mesh(geoCyl(0.25, 0.26, 0.14, 10), mat(0xd63c3c));
   cap.position.y = 1.74; g.add(cap);
-  const brim = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.25), mat(0xd63c3c));
+  const brim = new THREE.Mesh(geoBox(0.3, 0.05, 0.25), mat(0xd63c3c));
   brim.position.set(0, 1.68, 0.3); g.add(brim);
 
-  const legGeo = new THREE.BoxGeometry(0.2, 0.66, 0.24);
-  legGeo.translate(0, -0.33, 0);
+  const legGeo = geoBoxShifted(0.2, 0.66, 0.24, 0, -0.33, 0);
   const legL = new THREE.Mesh(legGeo, mat(pants));
   legL.position.set(-0.14, 0.66, 0); legL.castShadow = true; g.add(legL);
   const legR = new THREE.Mesh(legGeo, mat(pants));
   legR.position.set(0.14, 0.66, 0); legR.castShadow = true; g.add(legR);
 
-  const armGeo = new THREE.BoxGeometry(0.16, 0.6, 0.2);
-  armGeo.translate(0, -0.3, 0);
+  const armGeo = geoBoxShifted(0.16, 0.6, 0.2, 0, -0.3, 0);
   const armL = new THREE.Mesh(armGeo, mat(shirt));
   armL.position.set(-0.37, 1.32, 0); g.add(armL);
   const armR = new THREE.Mesh(armGeo, mat(shirt));
@@ -70,30 +69,30 @@ export class Player {
 
   /* ---------- دوچرخه و تخته‌اسکیت ---------- */
   _buildRides() {
-    const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
+    const mat = matLambert;
     const mk = (kind) => {
       const g = new THREE.Group();
       if (kind === 'bike') {
-        const frame = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 1.05), mat(0x2f6fed));
+        const frame = new THREE.Mesh(geoBox(0.14, 0.14, 1.05), mat(0x2f6fed));
         frame.position.set(0, 0.62, 0.05); g.add(frame);
-        const seat = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.1, 0.36), mat(0x1f2937));
+        const seat = new THREE.Mesh(geoBox(0.26, 0.1, 0.36), mat(0x1f2937));
         seat.position.set(0, 0.78, -0.42); g.add(seat);
-        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.07, 0.07), mat(0x4a4a52));
+        const bar = new THREE.Mesh(geoBox(0.62, 0.07, 0.07), mat(0x4a4a52));
         bar.position.set(0, 0.96, 0.5); g.add(bar);
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.42, 0.08), mat(0x9aa3ad));
+        const post = new THREE.Mesh(geoBox(0.08, 0.42, 0.08), mat(0x9aa3ad));
         post.position.set(0, 0.78, 0.5); g.add(post);
         for (const wz of [0.58, -0.58]) {
-          const w = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.06, 6, 14), mat(0x1f2937));
+          const w = new THREE.Mesh(geoTorus(0.34, 0.06, 6, 14), mat(0x1f2937));
           w.position.set(0, 0.34, wz);
           w.rotation.y = Math.PI / 2;
           w.castShadow = true;
           g.add(w);
         }
       } else {
-        const deck = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 1.1), mat(0xe67e22));
+        const deck = new THREE.Mesh(geoBox(0.34, 0.06, 1.1), mat(0xe67e22));
         deck.position.set(0, 0.16, 0); deck.castShadow = true; g.add(deck);
         for (const [wx, wz] of [[-0.12, 0.36], [0.12, 0.36], [-0.12, -0.36], [0.12, -0.36]]) {
-          const w = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.06, 8), mat(0xf2c94c));
+          const w = new THREE.Mesh(geoCyl(0.07, 0.07, 0.06, 8), mat(0xf2c94c));
           w.rotation.z = Math.PI / 2;
           w.position.set(wx, 0.08, wz); g.add(w);
         }

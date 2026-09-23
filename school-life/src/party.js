@@ -3,6 +3,7 @@
    جشن پایان سال: رقص، کاغذرنگی، بادکنک، دی‌جی و نورپردازی
    ============================================================ */
 import * as THREE from 'three';
+import { geoCyl, geoPlane, geoSph, matLambert } from './gfx.js';
 import { rand, randInt, choice, clamp, dist2D, faNum } from './utils.js';
 
 const DANCE_MOVES = ['چرخش', 'دست‌موج', 'پرش', 'قدم‌رو', 'کف‌زدن', 'چرخ‌کامل', 'حرکت ربات'];
@@ -37,14 +38,14 @@ export class PartySystem {
     this._built = true;
     const scene = this.world.scene;
     const M = this.world.M;
-    const L = (c, o = {}) => new THREE.MeshLambertMaterial({ color: c, ...o });
+    const L = matLambert;
 
     // صحنه و بلندگوها
     this.world.box(8, 0.6, 4, L(0x3b2a5b), 0, 0.3, 20, { collider: true });
     this.world.box(8.4, 0.5, 4.4, L(0x8b5cf6), 0, 0.62, 20);
     for (const [sx, sz] of [[-5.5, 20], [5.5, 20]]) {
       this.world.box(0.9, 2.2, 0.9, L(0x1f2937), sx, 1.1, sz, { collider: true });
-      const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.28, 0.12, 10), L(0x4a4a52));
+      const cone = new THREE.Mesh(geoCyl(0.42, 0.28, 0.12, 10), L(0x4a4a52));
       cone.rotation.x = Math.PI / 2;
       cone.position.set(sx, 1.7, sz + 0.5);
       scene.add(cone);
@@ -60,7 +61,7 @@ export class PartySystem {
     // ریسه‌های تزئینی
     for (let i = 0; i < 16; i++) {
       const x = -12 + i * 1.6;
-      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 5), L(choice(cols), { emissive: choice(cols), emissiveIntensity: 0.9 }));
+      const bulb = new THREE.Mesh(geoSph(0.12, 6, 5), L(choice(cols), { emissive: choice(cols), emissiveIntensity: 0.9 }));
       bulb.position.set(x, 3.6 + Math.sin(i * 0.6) * 0.35, 14);
       scene.add(bulb);
     }
@@ -74,10 +75,10 @@ export class PartySystem {
     for (let i = 0; i < n; i++) {
       const c = choice(cols);
       const g = new THREE.Group();
-      const b = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 7), new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: 0.15 }));
+      const b = new THREE.Mesh(geoSph(0.28, 8, 7), matLambert(c, { emissive: c, emissiveIntensity: 0.15 }));
       b.scale.y = 1.2;
       g.add(b);
-      const str = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.5, 4), new THREE.MeshLambertMaterial({ color: 0xdddddd }));
+      const str = new THREE.Mesh(geoCyl(0.01, 0.01, 0.5, 4), matLambert(0xdddddd));
       str.position.y = -0.55;
       g.add(str);
       g.position.set(rand(-14, 14), rand(1.5, 5.2), rand(12, 26));
@@ -239,7 +240,7 @@ export class PartySystem {
 
   _confetti(seed) {
     const scene = this.world.scene;
-    const geo = new THREE.PlaneGeometry(0.22, 0.34);
+    const geo = geoPlane(0.22, 0.34);
     const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
       color: choice([0xff3b6b, 0x3b82f6, 0xf2c94c, 0x22c55e, 0x8b5cf6, 0xffffff]),
       side: THREE.DoubleSide,
