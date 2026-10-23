@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b1020" />
+    <meta name="description" content="Vodi Config — manage, scan and share VLESS / VMess / Trojan / Shadowsocks links offline." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <title>Vodi Config</title>
+    <script>
+      // Apply theme + language before first paint to avoid a flash of the wrong theme.
+      (function () {
+        var settings = {};
+        try {
+          settings = JSON.parse(localStorage.getItem('vodi-config.settings.v1') || '{}') || {};
+        } catch (e) {
+          settings = {};
+        }
+        var lang = settings.lang === 'en' ? 'en' : 'fa';
+        var theme = settings.theme || 'dark';
+        if (theme === 'auto') {
+          theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+        var root = document.documentElement;
+        root.lang = lang;
+        root.dir = lang === 'fa' ? 'rtl' : 'ltr';
+        root.dataset.theme = theme;
+        document
+          .querySelector('meta[name="theme-color"]')
+          .setAttribute('content', theme === 'light' ? '#f2f5fc' : '#070b16');
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <div style="padding: 32px; text-align: center; font-family: sans-serif">
+        Vodi Config needs JavaScript to run.<br />وودی کانفیگ برای اجرا به جاوااسکریپت نیاز دارد.
+      </div>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

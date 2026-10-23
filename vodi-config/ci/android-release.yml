@@ -1,0 +1,120 @@
+name: Build Android APK / AAB
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'vodi-config/**'
+      - '.github/workflows/android-release.yml'
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'versionName (e.g. 1.1.0)'
+        required: false
+        default: '1.0.0'
+      version_code:
+        description: 'versionCode (integer, must increase)'
+        required: false
+        default: '1'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vodi-config
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: vodi-config/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Type-check, build web app and generate icons
+        run: |
+          npm run build
+          npm run icons
+
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
+      - name: Apply version from workflow input
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: vodi-config/android
+        run: |
+          sed -i "s/versionCode [0-9]\+/versionCode ${{ github.event.inputs.version_code }}/" app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"${{ github.event.inputs.version_name }}\"/" app/build.gradle
+
+      - name: Restore signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        working-directory: vodi-config/android
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > vodi-release.keystore
+            cat > keystore.properties <<EOF
+          storeFile=vodi-release.keystore
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+            echo "SIGNED=true" >> "$GITHUB_ENV"
+          else
+            echo "No keystore secret found — the release build will be unsigned."
+            echo "SIGNED=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build debug APK
+        working-directory: vodi-config/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Build release App Bundle (for Myket / Play)
+        working-directory: vodi-config/android
+        run: ./gradlew bundleRelease --no-daemon
+
+      - name: Build release APK (for direct install / Myket)
+        working-directory: vodi-config/android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Collect artifacts
+        working-directory: vodi-config/android
+        run: |
+          mkdir -p ../../artifacts
+          cp app/build/outputs/apk/debug/app-debug.apk ../../artifacts/vodi-config-debug.apk
+          cp app/build/outputs/apk/release/*.apk ../../artifacts/vodi-config-release.apk || true
+          cp app/build/outputs/bundle/release/*.aab ../../artifacts/vodi-config-release.aab || true
+          cd ../../artifacts && sha256sum * > SHA256SUMS.txt && ls -lh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vodi-config-android
+          path: artifacts/*
+          if-no-files-found: warn
+
+      - name: Attach files to GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true

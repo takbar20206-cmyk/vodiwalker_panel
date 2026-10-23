@@ -1,0 +1,37 @@
+{
+  "name": "vodi-config",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Vodi Config — offline VLESS/VMess/Trojan/SS link manager for Android",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "cap:sync": "npm run build && cap sync android",
+    "android:debug": "npm run cap:sync && cd android && ./gradlew assembleDebug",
+    "icons": "node scripts/make-icons.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "jsqr": "^1.4.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "vazirmatn": "^33.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}
