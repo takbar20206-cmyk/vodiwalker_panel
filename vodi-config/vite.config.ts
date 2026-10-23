@@ -18,6 +18,10 @@ export default defineConfig({
     strictPort: true,
     // the sandbox preview is served through a dynamic e2b.app hostname
     allowedHosts: true,
+    watch: {
+      // capacitor copies the build into android/ — don't reload on those writes
+      ignored: ['**/android/**', '**/dist/**'],
+    },
   },
   preview: {
     host: '0.0.0.0',
