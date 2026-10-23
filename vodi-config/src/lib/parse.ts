@@ -2,6 +2,21 @@ import type { ParsedConfig, Protocol } from './types';
 
 const KNOWN: Protocol[] = ['vless', 'vmess', 'trojan', 'ss'];
 
+/** Schemes we accept. Anything else (http, ftp, …) is not a config link. */
+const SUPPORTED_SCHEMES = new Set([
+  'vless',
+  'vmess',
+  'trojan',
+  'ss',
+  'ssr',
+  'hysteria',
+  'hysteria2',
+  'hy2',
+  'tuic',
+  'socks',
+  'socks5',
+]);
+
 const DEFAULT_PORTS: Record<string, number> = {
   vless: 443,
   vmess: 443,
@@ -200,6 +215,7 @@ export function parseConfig(raw: string): ParsedConfig | null {
   const line = raw.trim();
   if (!/^[a-z0-9+.-]+:\/\//i.test(line)) return null;
   const scheme = line.slice(0, line.indexOf('://')).toLowerCase();
+  if (!SUPPORTED_SCHEMES.has(scheme)) return null;
 
   if (scheme === 'vmess') return parseVmess(line);
   if (scheme === 'ss') return parseShadowsocks(line);

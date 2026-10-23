@@ -75,7 +75,9 @@ export function DetailSheet({
     openExternal(clientDeepLink(client, item.raw));
   };
 
-  const params = Object.entries(item.params);
+  // These keys are already shown in their own rows above.
+  const shownKeys = new Set(['type', 'net', 'security', 'tls']);
+  const params = Object.entries(item.params).filter(([key]) => !shownKeys.has(key));
 
   return (
     <Sheet title={t('detail.details')} onClose={onClose} closeLabel={t('action.close')}>

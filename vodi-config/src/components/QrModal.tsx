@@ -30,8 +30,19 @@ export function QrModal({ title, link, t, onClose, onCopy }: Props) {
       .then((url) => {
         if (active) setDataUrl(url);
       })
-      .catch(() => {
-        if (active) setFailed(true);
+      .catch(async () => {
+        // canvas can be unavailable in some WebViews — fall back to an SVG data URL
+        try {
+          const svg = await QRCode.toString(link, {
+            type: 'svg',
+            margin: 1,
+            errorCorrectionLevel: 'M',
+            color: { dark: '#0b1020', light: '#ffffff' },
+          });
+          if (active) setDataUrl(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+        } catch {
+          if (active) setFailed(true);
+        }
       });
     return () => {
       active = false;
