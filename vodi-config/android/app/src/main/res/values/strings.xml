@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Vodi Config</string>
+    <string name="title_activity_main">Vodi Config</string>
+    <string name="package_name">ir.vodiwalker.vodiconfig</string>
+    <string name="custom_url_scheme">ir.vodiwalker.vodiconfig</string>
+</resources>

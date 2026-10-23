@@ -1,0 +1,13 @@
+{
+  "appId": "ir.vodiwalker.vodiconfig",
+  "appName": "Vodi Config",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#070b16",
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  }
+}

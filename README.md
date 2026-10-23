@@ -19,3 +19,19 @@
 https://t.me/vodiwalkervpn03
 گیت هاب :
 https://github.com/Vodiwalker
+
+---
+
+## 📱 Vodi Config — اپ اندروید (جدید)
+
+علاوه بر پنل، یک اپ اندرویدی مستقل به نام **وودی کانفیگ / Vodi Config** در همین ریپو ساخته شده است:
+
+- مسیر پروژه: [`vodi-config/`](vodi-config)
+- مدیریت آفلاین کانفیگ‌های VLESS / VMess / Trojan / Shadowsocks
+- اسکن QR، ساخت QR، تست DNS، باز کردن در v2rayNG/Hiddify/Streisand/Clash
+- دوزبانه (فارسی/انگلیسی)، تم تیره و روشن، پشتیبان‌گیری JSON
+- انتشار: Android (Capacitor) + PWA — راهنمای مایکت در [`vodi-config/docs/PUBLISH-MYKET.md`](vodi-config/docs/PUBLISH-MYKET.md)
+
+```bash
+cd vodi-config && npm install && npm run dev   # اجرای نسخه وب
+```
