@@ -1,3 +1,21 @@
+# 📦 پروژه‌یҳа
+
+## 🌤 `iranweather/` — اپلیکیشن هواشناسی کامل ایران (Flutter)
+
+هوا، زلزله، رعدوبرق، کیفیت هوا و تمامی ۳۱ استان و ۷۳۸ شهر ایران.
+نیازی به هیچ key ندارد — همهٔ منابع آزاد و key‌بنشدنی هستند.
+
+```bash
+cd iranweather
+flutter create --platforms=android,ios,web .
+flutter pub get
+flutter run
+```
+
+✅ توضیح کامل: [`iranweather/README.md`](iranweather/README.md)
+
+---
+
 🔥 پنل Vodiwalker بالاخره منتشر شد! 🚀
 
 یک پنل قدرتمند، سریع و حرفه‌ای برای مدیریت سرویس‌ها و کانفیگ‌ها، با طراحی مدرن و امکانات کاربردی.
