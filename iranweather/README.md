@@ -49,6 +49,24 @@
 
 ---
 
+## 🌐 Web preview (live now)
+
+در این sandbox Flutter SDK نصب نیست، به‌همین‌خاطر یک نسخه‌یِ وب از همون طراحی
+בניو شده که可直接 اجرا است:
+
+```bash
+cd iranweather/web
+python3 -m http.server 8000 --bind 0.0.0.0
+# باز کن:  http://localhost:8000
+```
+
+تصویرِ زندهٔ UI + انیمیشنِ天空 + integrationِ واقعیِ Open-Meteo/USGS از
+مرورگرِ شما nagaganap (بزرگِ APIها CORS enabled هستند).
+
+---
+
+---
+
 ## 🚀 راه‌اندازی
 
 ### ۱. installِ Flutter

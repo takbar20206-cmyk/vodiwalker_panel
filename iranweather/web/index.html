@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05070f">
+<meta name="description" content="آیرانا — اپلیکیشن هواشناسی کامل ایران: هوا، زلزله، رعدوبرق، کیفیت هوا و ۷۳۸ شهر.">
+<title>آیرانا — هواشناسی ایران</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='68' cy='34' r='20' fill='%23FFD166'/%3E%3Ccircle cx='40' cy='55' r='20' fill='%23fff'/%3E%3C/svg%3E">
+</head>
+<body>
+<canvas id="sky"></canvas>
+<div id="skyOverlay"></div>
+
+<div id="phone">
+
+  <!-- ============ TAB: WEATHER ============ -->
+  <section class="tab" id="tab-weather" data-tab="weather">
+    <header class="top">
+      <div class="city-name" id="cityName">—</div>
+      <button class="icon-btn" id="btnLocate" title=" موقعیت جاری">📍</button>
+      <button class="icon-btn" id="btnRefresh" title="برای籙">↻</button>
+    </header>
+
+    <div class="hero">
+      <div class="hero-main">
+        <div class="big-temp" id="bigTemp">--°</div>
+        <div class="cond" id="condText">—</div>
+        <div class="feels" id="feelsText">—</div>
+      </div>
+      <div class="hero-icon" id="heroIcon"></div>
+    </div>
+
+    <div class="hilo">
+      <div class="hilo-item"><span class="hilo-ico">🔥</span><span id="hiText">--°</span><span class="hilo-lbl">حداکثر</span></div>
+      <div class="hilo-item"><span class="hilo-ico">❄️</span><span id="loText">--°</span><span class="hilo-lbl">حداقل</span></div>
+    </div>
+
+    <div class="alert-banner" id="alertBanner" hidden></div>
+
+    <div class="card">
+      <div class="card-title"><span>🌡 شاخص‌های هوا</span><span class="muted" id="fetchTime"></span></div>
+      <div class="metrics" id="metrics"></div>
+    </div>
+
+    <div class="card" id="aqiCard" hidden>
+      <div class="card-title"><span>🌫 کیفیت هوا</span><span class="muted" id="aqiLabel"></span></div>
+      <div class="aqi-row">
+        <div class="aqi-dot" id="aqiDot"></div>
+        <div class="aqi-main"><div class="aqi-num" id="aqiNum">--</div><div class="muted">European AQI / ۱۰۰</div></div>
+        <div class="aqi-extra">
+          <div><span class="muted">PM2.5</span> <b id="pm25">--</b></div>
+          <div><span class="muted">PM10</span> <b id="pm10">--</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>⏱ ۲۴ ساعتِ آینده</span></div>
+      <div class="scroll-x" id="hourly"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>📅 هفته‌ی پیش رو</span></div>
+      <div id="daily"></div>
+    </div>
+
+    <div class="card sun-card">
+      <div class="card-title"><span>🌅 طلوع و غروب</span></div>
+      <div class="sun-arc"><div class="sun-track"><div class="sun-dot" id="sunDot"></div></div></div>
+      <div class="sun-times">
+        <div><b id="sunriseT">--</b><span class="muted">طلوع</span></div>
+        <div><b id="sunsetT">--</b><span class="muted">غروب</span></div>
+        <div><b id="sunshineT">--</b><span class="muted">تابش</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB: EARTHQUAKE ============ -->
+  <section class="tab" id="tab-quake" data-tab="quake" hidden>
+    <header class="top">
+      <div class="city-name">لرزه‌های زمین</div>
+      <button class="icon-btn" id="btnQuakeRefresh">↻</button>
+    </header>
+    <div class="stat-row">
+      <div class="stat"><b id="qCount">--</b><span class="muted">لرزه ۲۴ ساعته</span></div>
+      <div class="stat"><b id="qMax">--</b><span class="muted">بزرگترین M</span></div>
+      <div class="stat"><b id="qTotal">--</b><span class="muted">در کل</span></div>
+    </div>
+    <div class="card map-card">
+      <svg id="quakeMap" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="map-hint">منبع: USGS · محدودهٔ ایران</div>
+    </div>
+    <div class="legend" id="quakeLegend"></div>
+    <div class="card-title" style="padding:14px 18px 6px"><span>📋 فهرست</span></div>
+    <div id="quakeList"></div>
+  </section>
+
+  <!-- ============ TAB: LIGHTNING ============ -->
+  <section class="tab" id="tab-light" data-tab="light" hidden>
+    <header class="top">
+      <div class="city-name">رعدوبرق</div>
+      <div class="live-badge" id="liveBadge"><span class="pulse"></span><span id="liveText">—</span></div>
+    </header>
+    <div class="card" id="lightAlert">
+      <div class="light-alert-row">
+        <div class="light-icon">⚡</div>
+        <div><div class="light-level" id="lightLevel">—</div>
+        <div class="muted" id="lightSource">—</div></div>
+      </div>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><b id="lCount">--</b><span class="muted">۲۴ ساعته</span></div>
+      <div class="stat"><b id="lActive">--</b><span class="muted">فعال</span></div>
+      <div class="stat"><b id="lDist">--</b><span class="muted">فاصله km</span></div>
+    </div>
+    <div class="card map-card">
+      <svg id="lightMap" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="map-hint">نشانه‌های رعدوبرق روی نقشهٔ ایران</div>
+    </div>
+    <div class="card-title" style="padding:14px 18px 6px"><span>📋 strikeهای اخیر</span></div>
+    <div id="lightList"></div>
+  </section>
+
+  <!-- ============ TAB: MAP ============ -->
+  <section class="tab" id="tab-map" data-tab="map" hidden>
+    <header class="top">
+      <div class="city-name">نقشه‌ی هواشناسی ایران</div>
+      <span class="muted" id="mapCount">—</span>
+    </header>
+    <div class="legend" id="tempLegend"></div>
+    <div class="card map-card">
+      <svg id="weatherMap" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="map-hint">دمای مرکزِ هر استان</div>
+    </div>
+    <div class="card-title" style="padding:14px 18px 6px"><span>🌡 دما بر اساس استان</span></div>
+    <div class="grid2" id="tempGrid"></div>
+  </section>
+
+  <!-- ============ TAB: CITIES ============ -->
+  <section class="tab" id="tab-city" data-tab="city" hidden>
+    <header class="top">
+      <input class="search" id="citySearch" type="search" placeholder="جستجوی شهر — مثل تهران، مشهد، شیراز" autocomplete="off">
+    </header>
+    <div id="cityResults"></div>
+  </section>
+
+  <!-- ============ BOTTOM NAV ============ -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-go="weather">🌤<span>هوا</span></button>
+    <button class="nav-item" data-go="quake">🌍<span>زلزله</span></button>
+    <button class="nav-item" data-go="light">⚡<span>رعد</span></button>
+    <button class="nav-item" data-go="map">🗺<span>نقشه</span></button>
+    <button class="nav-item" data-go="city">🏙<span>شهر</span></button>
+  </nav>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>
