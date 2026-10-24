@@ -52,16 +52,16 @@
 ## 🌐 Web preview (live now)
 
 در این sandbox Flutter SDK نصب نیست، به‌همین‌خاطر یک نسخه‌یِ وب از همون طراحی
-בניو شده که可直接 اجرا است:
+مستقیم از مرورگر اجرا می‌شود:
 
 ```bash
-cd iranweather/web
+cd iranweather/preview
 python3 -m http.server 8000 --bind 0.0.0.0
 # باز کن:  http://localhost:8000
 ```
 
-تصویرِ زندهٔ UI + انیمیشنِ天空 + integrationِ واقعیِ Open-Meteo/USGS از
-مرورگرِ شما nagaganap (بزرگِ APIها CORS enabled هستند).
+تصویرِ زندهٔ UI + انیمیشنِ آسمان + integrationِ واقعیِ Open-Meteo/USGS از
+مرورگرِ شما می‌رسد (این APIها CORS enabled هستند).
 
 ---
 
@@ -69,25 +69,32 @@ python3 -m http.server 8000 --bind 0.0.0.0
 
 ## 🚀 راه‌اندازی
 
-### ۱. installِ Flutter
-اگر Flutter نصب ندارید، از [flutter.dev](https://docs.flutter.dev/get-started/install)
-برنامه‌ی install را دریافت کنید.
-
-### ۲. ساختِ پلتفرم‌ها
+### یک‌خطی: ساختِ APK
 ```bash
 cd iranweather
-flutter create --platforms=android,ios,web,linux,macos,windows .
+./build_apk.sh
+```
+script، اگر Flutter SDK نصب نباشد خودش از GitHub دریافت می‌کند، پلتفرم android
+را می‌سازد، `pub get` انجام می‌دهد و `flutter build apk --release` اجرا می‌کند.
+APK در اینجا ساخته می‌شود:
+
+```
+build/app/outputs/flutter-apk/app-release.apk
+```
+
+برای ABIهایِ جداگانه (arm64 / armv7 / x86_64): `./build_apk.sh --split-per-abi`
+
+### دستی
+```bash
+flutter create --platforms=android,ios .
 flutter pub get
+flutter run
+flutter build apk --release
 ```
 > `flutter create .` فقط اسکیلفوردِ native را اضافه می‌کند و فایل‌هایِ موجود
 > (pubspec.yaml، lib/، assets/) را الدارات نمی‌کند.
-
-### ۳. run
-```bash
-flutter run
-# یا APK
-flutter build apk --release
-```
+> نسخه‌یِ وب پیش‌نمایش در `preview/` است و با پلتفرمِ webِ Flutter (که
+> `flutter create` می‌سازد) تضاد ندارد.
 
 ### ۴. permissionِ مکان (Android)
 در `android/app/src/main/AndroidManifest.xml` اضافه کنید:
