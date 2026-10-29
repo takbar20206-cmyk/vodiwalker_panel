@@ -1,0 +1,5 @@
+# VodiWalker Toolkit — dependencies (build & runtime)
+PySide6>=6.5,<7
+qrcode[pil]>=7.4,<9
+Pillow>=10,<14
+pyinstaller>=6.6,<7

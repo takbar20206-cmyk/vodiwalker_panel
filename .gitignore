@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# PyInstaller / local builds
+/build/
+/dist/
+/windows_app/build/
+/windows_app/dist/
+VodiWalker-Toolkit-win64.zip
+
+# misc
+*.log
+.DS_Store
